@@ -1,3 +1,10 @@
+# [1.3.0-beta.9](https://github.com/PepperPix/Kiln/compare/v1.3.0-beta.8...v1.3.0-beta.9) (2026-10-19)
+
+
+### Bug Fixes
+
+* **deps:** update vulnerable and stale dependencies ([69185db](https://github.com/PepperPix/Kiln/commit/69185db0d5d32045ed8ec5d9fc644487bbf0d250))
+
 # [1.3.0-beta.8](https://github.com/PepperPix/Kiln/compare/v1.3.0-beta.7...v1.3.0-beta.8) (2026-10-01)
 
 
