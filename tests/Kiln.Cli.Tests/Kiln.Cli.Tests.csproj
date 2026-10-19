@@ -9,9 +9,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Spectre.Console.Cli.Testing" Version="0.56.*" />
-    <PackageReference Include="TUnit" Version="1.71.*" />
-    <PackageReference Include="TUnit.Mocks" Version="1.71.*" />
+    <PackageReference Include="Spectre.Console.Cli.Testing" Version="0.57.*" />
+    <PackageReference Include="TUnit" Version="1.75.*" />
+    <PackageReference Include="TUnit.Mocks" Version="1.75.*" />
   </ItemGroup>
 
   <ItemGroup>
