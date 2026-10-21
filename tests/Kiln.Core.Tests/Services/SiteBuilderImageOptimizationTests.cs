@@ -10,11 +10,14 @@ public class SiteBuilderImageOptimizationTests
     private const int SourceHeight = 600;
     private const int TestMaxWidth = 400;
     private const int TestQuality = 70;
+    private static readonly byte[] TestPng = CreateTestPng();
 
     [Test]
-    public async Task BuildAsync_Production_ReferencedSiteStaticImage_IsDownscaledAndChanged()
+    [Arguments("/assets/")]
+    [Arguments("https://cdn.example.com/v2/media/")]
+    public async Task BuildAsync_Production_ReferencedSiteStaticImage_IsDownscaledAndChanged(string assetPrefix)
     {
-        var dir = CreateSite();
+        var dir = CreateSite(assetPrefix: assetPrefix);
 
         try
         {
@@ -33,6 +36,8 @@ public class SiteBuilderImageOptimizationTests
 
             using var decoded = SKBitmap.Decode(outputBytes);
             await Assert.That(decoded.Width).IsEqualTo(TestMaxWidth);
+            var html = await File.ReadAllTextAsync(Path.Combine(dir, "_site", "blog", "hello", "index.html"));
+            await Assert.That(html).Contains(assetPrefix + "img/referenced.png");
         }
         finally
         {
@@ -41,9 +46,11 @@ public class SiteBuilderImageOptimizationTests
     }
 
     [Test]
-    public async Task BuildAsync_Production_UnreferencedSiteStaticImage_RemainsByteIdentical()
+    [Arguments("/assets/")]
+    [Arguments("https://cdn.example.com/v2/media/")]
+    public async Task BuildAsync_Production_UnreferencedSiteStaticImage_RemainsByteIdentical(string assetPrefix)
     {
-        var dir = CreateSite();
+        var dir = CreateSite(assetPrefix: assetPrefix);
 
         try
         {
@@ -65,9 +72,11 @@ public class SiteBuilderImageOptimizationTests
     }
 
     [Test]
-    public async Task BuildAsync_Production_ThemeStaticImage_RemainsByteIdentical()
+    [Arguments("/assets/")]
+    [Arguments("https://cdn.example.com/v2/media/")]
+    public async Task BuildAsync_Production_ThemeStaticImage_RemainsByteIdentical(string assetPrefix)
     {
-        var dir = CreateSite();
+        var dir = CreateSite(assetPrefix: assetPrefix);
 
         try
         {
@@ -89,9 +98,11 @@ public class SiteBuilderImageOptimizationTests
     }
 
     [Test]
-    public async Task BuildAsync_Production_PageBundleImage_IsOptimized()
+    [Arguments("/assets/")]
+    [Arguments("https://cdn.example.com/v2/media/")]
+    public async Task BuildAsync_Production_PageBundleImage_IsOptimized(string assetPrefix)
     {
-        var dir = CreateSite();
+        var dir = CreateSite(assetPrefix: assetPrefix);
 
         try
         {
@@ -108,6 +119,8 @@ public class SiteBuilderImageOptimizationTests
 
             using var decoded = SKBitmap.Decode(outputBytes);
             await Assert.That(decoded.Width).IsEqualTo(TestMaxWidth);
+            var html = await File.ReadAllTextAsync(Path.Combine(dir, "_site", "blog", "bundle-post", "index.html"));
+            await Assert.That(html).Contains(assetPrefix + "content/posts/bundle-post/photo.png");
         }
         finally
         {
@@ -116,9 +129,11 @@ public class SiteBuilderImageOptimizationTests
     }
 
     [Test]
-    public async Task BuildAsync_Production_ImageOptimizationFalseFrontmatter_SkipsOptimizationForThatItem()
+    [Arguments("/assets/")]
+    [Arguments("https://cdn.example.com/v2/media/")]
+    public async Task BuildAsync_Production_ImageOptimizationFalseFrontmatter_SkipsOptimizationForThatItem(string assetPrefix)
     {
-        var dir = CreateSite();
+        var dir = CreateSite(assetPrefix: assetPrefix);
 
         try
         {
@@ -132,6 +147,8 @@ public class SiteBuilderImageOptimizationTests
             var outputPath = Path.Combine(dir, "_site", "assets", "content", "posts", "opted-out", "opted-out.png");
             var outputBytes = await File.ReadAllBytesAsync(outputPath);
             await Assert.That(outputBytes.SequenceEqual(originalBytes)).IsTrue();
+            var html = await File.ReadAllTextAsync(Path.Combine(dir, "_site", "blog", "opted-out", "index.html"));
+            await Assert.That(html).Contains(assetPrefix + "content/posts/opted-out/opted-out.png");
         }
         finally
         {
@@ -140,9 +157,11 @@ public class SiteBuilderImageOptimizationTests
     }
 
     [Test]
-    public async Task BuildAsync_Production_ExcludeGlob_SkipsMatchingImageEvenWhenReferenced()
+    [Arguments("/assets/")]
+    [Arguments("https://cdn.example.com/v2/media/")]
+    public async Task BuildAsync_Production_ExcludeGlob_SkipsMatchingImageEvenWhenReferenced(string assetPrefix)
     {
-        var dir = CreateSite(exclude: ["static/img/excluded.png"]);
+        var dir = CreateSite(exclude: ["static/img/excluded.png"], assetPrefix: assetPrefix);
 
         try
         {
@@ -156,6 +175,8 @@ public class SiteBuilderImageOptimizationTests
             var outputPath = Path.Combine(dir, "_site", "assets", "img", "excluded.png");
             var outputBytes = await File.ReadAllBytesAsync(outputPath);
             await Assert.That(outputBytes.SequenceEqual(originalBytes)).IsTrue();
+            var html = await File.ReadAllTextAsync(Path.Combine(dir, "_site", "blog", "hello", "index.html"));
+            await Assert.That(html).Contains(assetPrefix + "img/excluded.png");
         }
         finally
         {
@@ -164,9 +185,11 @@ public class SiteBuilderImageOptimizationTests
     }
 
     [Test]
-    public async Task BuildAsync_Production_SecondBuild_UsesCache_DoesNotReOptimize()
+    [Arguments("/assets/")]
+    [Arguments("https://cdn.example.com/v2/media/")]
+    public async Task BuildAsync_Production_SecondBuild_UsesCache_DoesNotReOptimize(string assetPrefix)
     {
-        var dir = CreateSite();
+        var dir = CreateSite(assetPrefix: assetPrefix);
 
         try
         {
@@ -191,9 +214,11 @@ public class SiteBuilderImageOptimizationTests
     }
 
     [Test]
-    public async Task BuildAsync_Production_WebpEnabled_ChangesExtensionAndRewritesHtmlReference()
+    [Arguments("/assets/")]
+    [Arguments("https://cdn.example.com/v2/media/")]
+    public async Task BuildAsync_Production_WebpEnabled_ChangesExtensionAndRewritesHtmlReference(string assetPrefix)
     {
-        var dir = CreateSite(webp: true);
+        var dir = CreateSite(webp: true, assetPrefix: assetPrefix);
 
         try
         {
@@ -208,8 +233,13 @@ public class SiteBuilderImageOptimizationTests
             await Assert.That(File.Exists(pngOutputPath)).IsFalse();
 
             var postHtml = await File.ReadAllTextAsync(Path.Combine(dir, "_site", "blog", "hello", "index.html"));
-            await Assert.That(postHtml).Contains("/assets/img/referenced.webp");
+            await Assert.That(postHtml).Contains(assetPrefix + "img/referenced.webp");
             await Assert.That(postHtml).DoesNotContain("/assets/img/referenced.png");
+            var bundleOutput = Path.Combine(dir, "_site", "assets", "content", "posts", "bundle-post", "photo.webp");
+            using var decodedBundle = SKBitmap.Decode(await File.ReadAllBytesAsync(bundleOutput));
+            await Assert.That(decodedBundle.Width).IsEqualTo(TestMaxWidth);
+            var bundleHtml = await File.ReadAllTextAsync(Path.Combine(dir, "_site", "blog", "bundle-post", "index.html"));
+            await Assert.That(bundleHtml).Contains(assetPrefix + "content/posts/bundle-post/photo.webp");
         }
         finally
         {
@@ -217,7 +247,7 @@ public class SiteBuilderImageOptimizationTests
         }
     }
 
-    private static string CreateSite(bool webp = false, IReadOnlyList<string>? exclude = null)
+    private static string CreateSite(bool webp = false, IReadOnlyList<string>? exclude = null, string assetPrefix = "/assets/")
     {
         var dir = Path.Combine(Path.GetTempPath(), $"kiln-image-opt-{Guid.NewGuid():N}");
         Directory.CreateDirectory(Path.Combine(dir, "content", "posts", "bundle-post"));
@@ -234,6 +264,7 @@ public class SiteBuilderImageOptimizationTests
             $"""
             title: Test Site
             baseUrl: http://localhost:5555
+            assetPrefix: {assetPrefix}
             collections:
               posts:
                 directory: content/posts
@@ -268,7 +299,7 @@ public class SiteBuilderImageOptimizationTests
             ---
             ![Bundle Photo](photo.png)
             """);
-        File.WriteAllBytes(Path.Combine(dir, "content", "posts", "bundle-post", "photo.png"), CreateTestPng());
+        File.WriteAllBytes(Path.Combine(dir, "content", "posts", "bundle-post", "photo.png"), TestPng);
 
         File.WriteAllText(Path.Combine(dir, "content", "posts", "opted-out", "index.md"),
             """
@@ -279,12 +310,12 @@ public class SiteBuilderImageOptimizationTests
             ---
             ![Opted-out Image](opted-out.png)
             """);
-        File.WriteAllBytes(Path.Combine(dir, "content", "posts", "opted-out", "opted-out.png"), CreateTestPng());
+        File.WriteAllBytes(Path.Combine(dir, "content", "posts", "opted-out", "opted-out.png"), TestPng);
 
-        File.WriteAllBytes(Path.Combine(dir, "static", "img", "referenced.png"), CreateTestPng());
-        File.WriteAllBytes(Path.Combine(dir, "static", "img", "unreferenced.png"), CreateTestPng());
-        File.WriteAllBytes(Path.Combine(dir, "static", "img", "excluded.png"), CreateTestPng());
-        File.WriteAllBytes(Path.Combine(dir, "themes", "default", "static", "img", "theme.png"), CreateTestPng());
+        File.WriteAllBytes(Path.Combine(dir, "static", "img", "referenced.png"), TestPng);
+        File.WriteAllBytes(Path.Combine(dir, "static", "img", "unreferenced.png"), TestPng);
+        File.WriteAllBytes(Path.Combine(dir, "static", "img", "excluded.png"), TestPng);
+        File.WriteAllBytes(Path.Combine(dir, "themes", "default", "static", "img", "theme.png"), TestPng);
 
         File.WriteAllText(Path.Combine(dir, "themes", "default", "layouts", "default.html"),
             "<html><body>{{ page.content }}</body></html>");
@@ -297,13 +328,14 @@ public class SiteBuilderImageOptimizationTests
     private static byte[] CreateTestPng()
     {
         using var bitmap = new SKBitmap(SourceWidth, SourceHeight);
+        var pixels = new SKColor[SourceWidth * SourceHeight];
         for (var y = 0; y < SourceHeight; y++)
         {
             for (var x = 0; x < SourceWidth; x++)
             {
-                var color = new SKColor((byte)(x % 256), (byte)(y % 256), (byte)((x + y) % 256));
-                bitmap.SetPixel(x, y, color);
+                pixels[y * SourceWidth + x] = new SKColor((byte)(x % 256), (byte)(y % 256), (byte)((x + y) % 256));
             }
+            bitmap.Pixels = pixels;
         }
         using var data = bitmap.Encode(SKEncodedImageFormat.Png, 90);
         return data.ToArray();

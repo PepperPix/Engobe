@@ -28,7 +28,7 @@ public sealed class SiteConfiguration
     /// <summary>Gets the name of the theme, which is the name of a directory below <see cref="ThemesDir"/>. The default is <c>default</c>.</summary>
     public string Theme { get; init; } = "default";
 
-    /// <summary>Gets the URL prefix of the asset directory in the output. The default is <c>/assets/</c>.</summary>
+    /// <summary>Gets the public URL base for assets. Physical files remain under <c>assets/</c>; the default URL base is <c>/assets/</c>.</summary>
     public string AssetPrefix { get; init; } = "/assets/";
 
     /// <summary>Gets the output directory, relative to the project directory. The default is <c>_site</c>.</summary>

@@ -28,6 +28,31 @@ public class ShortcodeProcessorTests
     }
 
     [Test]
+    public async Task Process_PluginAssetHelperRetainsCanonicalPublicContract()
+    {
+        var tempDir = CreatePluginWithShortcode(
+            "email-protect",
+            "email",
+            "<img src=\"{{ plugin_asset_url 'img/logo.svg' }}\">");
+
+        try
+        {
+            var warnings = new Collection<string>();
+            var result = new ShortcodeProcessor().Process(
+                "{% email %}",
+                [new PluginDefinition { Name = "Email Protect", Directory = tempDir, Shortcodes = ["email"] }],
+                warnings);
+
+            await Assert.That(result).IsEqualTo("<img src=\"/assets/plugins/email-protect/img/logo.svg\">");
+            await Assert.That(warnings).IsEmpty();
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Test]
     public async Task Process_ReplacesMultipleShortcodesInSameBody()
     {
         var tempDir = CreatePluginWithShortcode("email-protect", "email", "<span>{{ arg0 }}</span>");

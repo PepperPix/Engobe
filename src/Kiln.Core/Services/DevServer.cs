@@ -50,12 +50,16 @@ public sealed class DevServer(ISiteBuilder siteBuilder, ISiteConfigLoader siteCo
         {
             Server = this,
             SiteBuilder = siteBuilder,
+            ConfigLoader = siteConfigLoader,
             SearchIndexer = searchIndexer,
             PendingChanges = pendingChanges,
             DebounceLock = debounceLock,
             RebuildSync = rebuildSync,
             ProjectPath = projectPath,
             OutputDir = outputDirFullPath,
+            AssetUrls = new AssetUrlResolver(config, BuildEnvironment.Development),
+            StartupAssetPrefix = config.AssetPrefix,
+            StartupBasePath = config.BasePath,
             IncludeDrafts = includeDrafts,
             SearchOptions = config.Search,
             CancellationToken = ct
@@ -91,7 +95,7 @@ public sealed class DevServer(ISiteBuilder siteBuilder, ISiteConfigLoader siteCo
             try
             {
                 var context = await listener.GetContextAsync().WaitAsync(ct).ConfigureAwait(false);
-                _ = Task.Run(() => ServeRequestAsync(context, serveRoot, ct), CancellationToken.None);
+                _ = Task.Run(() => ServeRequestAsync(context, serveRoot, rebuildContext.AssetUrls, ct), CancellationToken.None);
             }
             catch (OperationCanceledException)
             {
@@ -189,6 +193,17 @@ public sealed class DevServer(ISiteBuilder siteBuilder, ISiteConfigLoader siteCo
             await state.RebuildSync.WaitAsync(state.CancellationToken).ConfigureAwait(false);
             try
             {
+                var currentConfig = state.ConfigLoader.Load(state.ProjectPath);
+                if (!string.Equals(currentConfig.AssetPrefix, state.StartupAssetPrefix, StringComparison.Ordinal)
+                    || !string.Equals(currentConfig.BasePath, state.StartupBasePath, StringComparison.Ordinal))
+                {
+                    await state.Server.BroadcastEventAsync(
+                        "error",
+                        "The assetPrefix or site base path changed. Restart kiln serve to apply the new routing configuration.",
+                        state.CancellationToken).ConfigureAwait(false);
+                    return;
+                }
+
                 var result = await state.SiteBuilder
                     .BuildAsync(state.ProjectPath, state.IncludeDrafts, BuildEnvironment.Development, state.CancellationToken)
                     .ConfigureAwait(false);
@@ -239,7 +254,11 @@ public sealed class DevServer(ISiteBuilder siteBuilder, ISiteConfigLoader siteCo
         }
     }
 
-    private async Task ServeRequestAsync(HttpListenerContext context, string outputDir, CancellationToken ct)
+    private async Task ServeRequestAsync(
+        HttpListenerContext context,
+        string outputDir,
+        AssetUrlResolver assetUrls,
+        CancellationToken ct)
     {
         const int httpNotFound = 404;
         const int httpForbidden = 403;
@@ -259,6 +278,24 @@ public sealed class DevServer(ISiteBuilder siteBuilder, ISiteConfigLoader siteCo
         {
             await RegisterSseClientAsync(context, ct).ConfigureAwait(false);
             return;
+        }
+
+        if (assetUrls.TryGetKey(requestPath, out var assetKey))
+        {
+            requestPath = "/assets/" + assetKey;
+        }
+        else if (!string.IsNullOrEmpty(assetUrls.SiteBasePath))
+        {
+            if (requestPath.Equals(assetUrls.SiteBasePath, StringComparison.Ordinal))
+                requestPath = "/";
+            else if (requestPath.StartsWith(assetUrls.SiteBasePath + "/", StringComparison.Ordinal))
+                requestPath = requestPath[assetUrls.SiteBasePath.Length..];
+            else
+            {
+                context.Response.StatusCode = httpNotFound;
+                context.Response.Close();
+                return;
+            }
         }
 
         if (requestPath == "/")
@@ -546,6 +583,8 @@ public sealed class DevServer(ISiteBuilder siteBuilder, ISiteConfigLoader siteCo
 
         public required ISiteBuilder SiteBuilder { get; init; }
 
+        public required ISiteConfigLoader ConfigLoader { get; init; }
+
         public required ISearchIndexer SearchIndexer { get; init; }
 
         public required HashSet<string> PendingChanges { get; init; }
@@ -557,6 +596,12 @@ public sealed class DevServer(ISiteBuilder siteBuilder, ISiteConfigLoader siteCo
         public required string ProjectPath { get; init; }
 
         public required string OutputDir { get; init; }
+
+        public required AssetUrlResolver AssetUrls { get; init; }
+
+        public required string StartupAssetPrefix { get; init; }
+
+        public required string StartupBasePath { get; init; }
 
         public required bool IncludeDrafts { get; init; }
 

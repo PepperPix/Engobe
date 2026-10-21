@@ -1,6 +1,8 @@
 title: {{NAME}}
 description: A new Kiln site
 baseUrl: http://localhost:5555
+assetPrefix: /assets/
+# For a CDN, use a URL such as https://cdn.example.com/v2/media/; map that origin to the contents of _site/assets/.
 language: en
 theme: default
 

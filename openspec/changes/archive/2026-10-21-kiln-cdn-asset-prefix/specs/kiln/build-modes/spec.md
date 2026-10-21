@@ -45,6 +45,10 @@ Kiln SHALL treat a URL as an owned asset when scheme, host, and effective port m
 - **WHEN** HTML or CSS references `https://cdn.example.com/assets/missing.png?v=2#detail` under the configured base `https://cdn.example.com/assets/` and the local file is missing
 - **THEN** the build SHALL end with an error including source and asset reference, without contacting the CDN host.
 
+#### Scenario: Target paths have case-sensitive URL semantics
+- **WHEN** a checked reference differs in path case from the local output file, such as `Logo.svg` instead of `logo.svg`
+- **THEN** Kiln SHALL report a missing target on HTML, CSS, and Atom reference surfaces, independently of the local filesystem's case behavior; exactly matching asset and page paths SHALL pass, and fingerprint renames SHALL not correct mismatched case silently.
+
 #### Scenario: An owned CDN file with query and fragment exists
 - **WHEN** an asset reference under the configured CDN base carries query/fragment and the associated local output file exists
 - **THEN** local checking SHALL succeed independently of a network connection to the CDN.
@@ -64,6 +68,10 @@ Kiln SHALL treat a URL as an owned asset when scheme, host, and effective port m
 #### Scenario: Explicitly disable link checking
 - **WHEN** `build.linkCheck: false` applies and an owned referenced target is missing
 - **THEN** Kiln SHALL not produce an existence-checking error for it; URL projection and enabled fingerprinting of existing files SHALL still occur.
+
+#### Scenario: Search entrypoints are generated after the Core build
+- **WHEN** search is enabled and the site-local `pagefind/pagefind.js` or `pagefind/pagefind-ui.css` entrypoint under the effective site base path is not yet present
+- **THEN** Core link checking SHALL defer only that entrypoint and report an explicit warning that search indexing must run before publishing; other missing paths, incorrect base paths, and missing asset files SHALL remain errors, and search-disabled builds SHALL not apply this exception.
 
 ### Requirement: Complete references during optimization
 Kiln SHALL minify CSS/JavaScript/SVG in production, then finalize asset dependencies including fingerprints and reference rewrites, then minify HTML, and finally run enabled link checking. In development, Kiln SHALL omit minification, fingerprinting, and link checking; public URL projection SHALL still apply.

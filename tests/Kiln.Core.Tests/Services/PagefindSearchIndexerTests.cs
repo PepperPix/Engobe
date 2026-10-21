@@ -76,6 +76,24 @@ public class PagefindSearchIndexerTests
     }
 
     [Test]
+    public async Task IndexAsync_CdnPrefixAndSubfolder_StillIndexesThePhysicalOutputDirectory()
+    {
+        var provider = new FakeBinaryProvider("/fake/pagefind");
+        var runner = new RecordingProcessRunner(new ProcessRunResult(0, string.Empty, string.Empty));
+        var indexer = new PagefindSearchIndexer(provider, runner);
+
+        var result = await indexer.IndexAsync(
+            "/site/_site",
+            new SearchOptions { Enabled = true },
+            allowDownload: false,
+            CancellationToken.None);
+
+        await Assert.That(result.Success).IsTrue();
+        await Assert.That(runner.LastArguments).IsEqualTo("--site \"/site/_site\"");
+        await Assert.That(runner.LastArguments).DoesNotContain("cdn.example.com");
+    }
+
+    [Test]
     public async Task IndexAsync_OutputDirWithSpacesAndQuotes_IsQuotedSafely()
     {
         var provider = new FakeBinaryProvider("/fake/pagefind");

@@ -36,6 +36,10 @@ Code inspection on 2026-10-21 confirmed additional gaps: `FeedGenerator.Generate
 
 This defines the shared asset-addressing contract. Existing base-path, shortcode, and API-compatibility boundaries remain; the template variable change is explicitly a behavior migration, not a public .NET signature change.
 
+**Review correction confirmed on 2026-10-21:** Pagefind indexing remains a CLI stage after the Core build. When search is enabled, the Core link checker defers missing site-local `pagefind/pagefind.js` and `pagefind/pagefind-ui.css` entrypoints at the effective site base path and reports an explicit warning. It does not defer other paths or asset references, and it performs normal checks when search is disabled. Moving index generation into the Core build is rejected to preserve the existing ownership and public APIs. Newly scaffolded sites must include the existing search script. The missing-binary smoke test must isolate its child process from installed Pagefind binaries and cached downloads.
+
+**Final review corrections confirmed on 2026-10-21:** Offline target lookup, rename manifests, and CSS dependency keys use case-sensitive URL paths on all platforms. Fingerprinting must not silently correct a path's spelling. Asset prefixes reject raw and percent-encoded backslashes before URI normalization; normalization is rejected as an alternative because it would silently change the configured namespace.
+
 ## Risks / Trade-offs
 - [Effective rather than raw `site.asset_prefix`] → Provide a migration notice for themes with additional `site.base_path` composition; helper-based themes need no manual prefixing.
 - [Incomplete rewrites] → Test the HTML/CSS/Atom/WebP/hash/suffix matrix and disabled fingerprinting; protect public API/shortcode callers and the canonical index.
