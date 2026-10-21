@@ -443,8 +443,10 @@ public class AssetPipelineIntegrationTests
 
                 var fingerprinted = await builder.BuildAsync(dir, false, BuildEnvironment.Production, CancellationToken.None);
                 await Assert.That(fingerprinted.Success).IsFalse();
-                await Assert.That(string.Join("; ", fingerprinted.Errors))
-                    .Contains("css/site.css -> css/base.css -> css/site.css");
+                var diagnostic = string.Join("; ", fingerprinted.Errors);
+                await Assert.That(
+                    diagnostic.Contains("css/site.css -> css/base.css -> css/site.css", StringComparison.Ordinal)
+                    || diagnostic.Contains("css/base.css -> css/site.css -> css/base.css", StringComparison.Ordinal)).IsTrue();
 
                 await File.WriteAllTextAsync(Path.Combine(dir, "themes", "default", "static", "css", "base.css"), "@import 'base.css';");
                 var selfCycle = await builder.BuildAsync(dir, false, BuildEnvironment.Production, CancellationToken.None);
@@ -654,7 +656,7 @@ public class AssetPipelineIntegrationTests
                         error.Contains("/assets/css/base", StringComparison.Ordinal)
                         && error.Contains("Main.woff2?v=2#font", StringComparison.Ordinal))).IsTrue();
                     await Assert.That(result.Errors.Any(static error =>
-                        error.Contains("blog/feed.xml", StringComparison.Ordinal)
+                        error.Contains("/blog/feed.xml", StringComparison.Ordinal)
                         && error.Contains("Picture.svg?v=2#preview", StringComparison.Ordinal))).IsTrue();
                     await Assert.That(result.Errors.Any(static error =>
                         error.Contains("/assets/css/site", StringComparison.Ordinal)
@@ -859,7 +861,8 @@ public class AssetPipelineIntegrationTests
             .AppendLine("  posts:")
             .AppendLine("    directory: content/posts")
             .AppendLine("    permalink: /blog/:slug/")
-            .ToString();
+            .ToString()
+            .ReplaceLineEndings("\n");
 
         File.WriteAllText(Path.Combine(dir, "site.yaml"), siteYaml);
 
@@ -945,11 +948,43 @@ public class AssetPipelineIntegrationTests
         return dir;
     }
 
-    private static string CreateReferenceFixture(string assetPrefix, string baseUrl)
+    [Test]
+    [Arguments("\n", "/media/")]
+    [Arguments("\r\n", "/media/")]
+    [Arguments("\n", "https://cdn.example.com/v2/media/")]
+    [Arguments("\r\n", "https://cdn.example.com/v2/media/")]
+    public async Task ReferenceFixture_ConfiguresPrefixAndFeedWithEitherLineEnding(string lineEnding, string prefix)
+    {
+        var dir = CreateReferenceFixture(prefix, "https://example.org/docs/", lineEnding);
+        try
+        {
+            var config = new SiteConfigLoader().Load(dir);
+            await Assert.That(config.AssetPrefix).IsEqualTo(prefix);
+            await Assert.That(config.Collections["posts"].Feed).IsTrue();
+            await Assert.That(config.BasePath).IsEqualTo("/docs");
+
+            var configPath = Path.Combine(dir, "site.yaml");
+            await File.WriteAllTextAsync(configPath, (await File.ReadAllTextAsync(configPath))
+                .ReplaceLineEndings(lineEnding)
+                .Replace($"assetPrefix: {prefix}{lineEnding}", string.Empty, StringComparison.Ordinal));
+            await SetAssetPrefixAsync(dir, prefix, enableSearch: true);
+            config = new SiteConfigLoader().Load(dir);
+            await Assert.That(config.AssetPrefix).IsEqualTo(prefix);
+            await Assert.That(config.Search.Enabled).IsTrue();
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    private static string CreateReferenceFixture(string assetPrefix, string baseUrl, string lineEnding = "\n")
     {
         var dir = CreateSite();
         var configPath = Path.Combine(dir, "site.yaml");
+        File.WriteAllText(configPath, File.ReadAllText(configPath).ReplaceLineEndings(lineEnding));
         var yaml = File.ReadAllText(configPath)
+            .ReplaceLineEndings("\n")
             .Replace("baseUrl: http://localhost:5555", $"baseUrl: {baseUrl}", StringComparison.Ordinal)
             .Replace("    permalink: /blog/:slug/", "    permalink: /blog/:slug/\n    feed: true", StringComparison.Ordinal)
             .Replace("build:\n", $"assetPrefix: {assetPrefix}\nbuild:\n", StringComparison.Ordinal);
@@ -983,7 +1018,7 @@ public class AssetPipelineIntegrationTests
     private static async Task SetAssetPrefixAsync(string projectPath, string prefix, bool enableSearch = false)
     {
         var configPath = Path.Combine(projectPath, "site.yaml");
-        var yaml = await File.ReadAllTextAsync(configPath);
+        var yaml = (await File.ReadAllTextAsync(configPath)).ReplaceLineEndings("\n");
         var search = enableSearch ? "search:\n  enabled: true\n" : string.Empty;
         await File.WriteAllTextAsync(
             configPath,
