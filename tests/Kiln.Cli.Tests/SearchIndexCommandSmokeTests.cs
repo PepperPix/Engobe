@@ -41,6 +41,8 @@ public class SearchIndexCommandSmokeTests
                 UseShellExecute = false,
             };
             psi.Environment["KILN_PAGEFIND_CACHE_DIR"] = isolatedCacheDir;
+            psi.Environment["PATH"] = string.Empty;
+            psi.Environment.Remove("KILN_PAGEFIND_PATH");
 
             using var process = Process.Start(psi)!;
             var output = await process.StandardOutput.ReadToEndAsync();

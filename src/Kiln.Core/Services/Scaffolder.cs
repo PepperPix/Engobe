@@ -51,6 +51,7 @@ public sealed class Scaffolder : IScaffolder
         ("themes/default/static/css/style.css", "themes/default/static/css/style.css"),
         ("themes/default/static/css/prism-ember.css", "themes/default/static/css/prism-ember.css"),
         ("themes/default/static/css/api.css", "themes/default/static/css/api.css"),
+        ("themes/default/static/js/kiln-search.js", "themes/default/static/js/kiln-search.js"),
         ("themes/default/static/favicon.svg", "themes/default/static/favicon.svg"),
     ];
 

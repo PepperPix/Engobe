@@ -1,6 +1,7 @@
 namespace Kiln.Services;
 
 using Kiln.Models;
+using Kiln.Abstractions;
 using Scriban.Runtime;
 
 /// <summary>
@@ -29,6 +30,8 @@ public sealed class SharedRenderContext
     /// </summary>
     public required IReadOnlyDictionary<string, IReadOnlyList<NavigationNode>> NavTree { get; init; }
 
+    internal AssetUrlResolver AssetUrls { get; init; } = null!;
+
     /// <summary>
     /// Creates the shared render context of a build.
     /// </summary>
@@ -43,7 +46,25 @@ public sealed class SharedRenderContext
         IReadOnlyDictionary<string, IReadOnlyList<NavigationNode>>? navTree = null)
     {
         ArgumentNullException.ThrowIfNull(site);
+        return BuildCore(site, allTaxonomies, navTree, new AssetUrlResolver(site, BuildEnvironment.Development));
+    }
+
+    internal static SharedRenderContext BuildForBuild(
+        SiteConfiguration site,
+        IReadOnlyDictionary<string, IReadOnlyList<TaxonomyTerm>> allTaxonomies,
+        IReadOnlyDictionary<string, IReadOnlyList<NavigationNode>>? navTree,
+        AssetUrlResolver assetUrls)
+        => BuildCore(site, allTaxonomies, navTree, assetUrls);
+
+    private static SharedRenderContext BuildCore(
+        SiteConfiguration site,
+        IReadOnlyDictionary<string, IReadOnlyList<TaxonomyTerm>> allTaxonomies,
+        IReadOnlyDictionary<string, IReadOnlyList<NavigationNode>>? navTree,
+        AssetUrlResolver assetUrls)
+    {
+        ArgumentNullException.ThrowIfNull(site);
         ArgumentNullException.ThrowIfNull(allTaxonomies);
+        ArgumentNullException.ThrowIfNull(assetUrls);
 
         var collections = site.Collections.ToDictionary(
             kvp => kvp.Key,
@@ -74,14 +95,15 @@ public sealed class SharedRenderContext
                 origin = site.Origin,
                 base_path = site.BasePath,
                 language = site.Language,
-                asset_prefix = site.AssetPrefix,
+                asset_prefix = assetUrls.EffectiveBase,
                 search = new { enabled = site.Search.Enabled }
             },
             Collections = collections,
             Taxonomies = taxonomies,
             Plugins = new Dictionary<string, object>(site.Plugins),
             Theme = new Dictionary<string, object>(site.ThemeConfig),
-            NavTree = navTree ?? new Dictionary<string, IReadOnlyList<NavigationNode>>()
+            NavTree = navTree ?? new Dictionary<string, IReadOnlyList<NavigationNode>>(),
+            AssetUrls = assetUrls
         };
     }
 

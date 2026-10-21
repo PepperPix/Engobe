@@ -55,11 +55,15 @@ Kiln SHALL accept `assetPrefix` in `site.yaml` as the public URL base: a root-re
 - **THEN** Kiln SHALL use the same public base as for `https://cdn.example.com/assets/` and preserve the scheme separator.
 
 ### Requirement: Reject invalid asset bases
-Kiln SHALL report relative prefixes without a leading slash, protocol-relative URLs, schemes other than HTTP(S), credentials, query/fragment in the prefix, and path-traversal segments as configuration errors. Query/fragment on individual asset references SHALL remain allowed.
+Kiln SHALL report relative prefixes without a leading slash, protocol-relative URLs, schemes other than HTTP(S), credentials, query/fragment in the prefix, raw or percent-encoded backslashes, and path-traversal segments as configuration errors. Query/fragment on individual asset references SHALL remain allowed.
 
 #### Scenario: An invalid prefix is rejected
 - **WHEN** `assetPrefix` contains, for example, `cdn.example.com/assets`, `//cdn.example.com/assets/`, `file:///private/`, `/../assets/`, or `https://cdn.example.com/assets/?token=1`
 - **THEN** Kiln SHALL report a configuration error for `assetPrefix` before asset files are output.
+
+#### Scenario: Reject backslashes before URI normalization
+- **WHEN** a root-relative or absolute prefix contains a raw or percent-encoded backslash, including `/media\..\..\outside/` or `https://cdn.example.com/media%5Cimages/`
+- **THEN** Kiln SHALL reject the prefix before URI parsing can normalize its path and before output.
 
 ### Requirement: Project content asset URLs to the public base
 Kiln SHALL map owned canonical and already prefixed asset references in HTML attributes `src`, `href`, `srcset`, and `poster` to the effective public asset base. Subpaths, query/fragment, and `srcset` descriptors SHALL be preserved; foreign external URLs and content page links SHALL remain unchanged. Already correctly prefixed URLs SHALL not be prefixed again.

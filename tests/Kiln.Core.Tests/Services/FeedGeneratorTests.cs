@@ -1,5 +1,6 @@
 namespace Kiln.Core.Tests.Services;
 
+using System.Xml.Linq;
 using Kiln.Services;
 
 public class FeedGeneratorTests
@@ -59,6 +60,47 @@ public class FeedGeneratorTests
 
             await Assert.That(feed).Contains("Hello World");
             await Assert.That(feed).Contains("http://localhost:5555/blog/hello-world/");
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Test]
+    public async Task BuildAsync_FeedProjectsAssetContentWithoutChangingArticleLinks()
+    {
+        var dir = CreateSiteWithFeedCollection();
+
+        try
+        {
+            var configPath = Path.Combine(dir, "site.yaml");
+            var yaml = await File.ReadAllTextAsync(configPath);
+            await File.WriteAllTextAsync(
+                configPath,
+                yaml.Replace("baseUrl: http://localhost:5555", "baseUrl: https://example.org/docs/", StringComparison.Ordinal)
+                    .Replace("collections:\n", "assetPrefix: /media/\ncollections:\n", StringComparison.Ordinal));
+            await File.WriteAllTextAsync(
+                Path.Combine(dir, "content", "posts", "hello-world.md"),
+                """
+                ---
+                title: Hello World
+                date: 2026-01-01
+                ---
+                <img src="/assets/images/hero.svg?variant=small&amp;mode=detail#preview" srcset="/assets/images/hero.svg 1x" poster="/assets/images/poster.svg">
+                """);
+
+            var result = await CreateBuilder().BuildAsync(dir);
+
+            await Assert.That(result.Success).IsTrue();
+            var feed = XDocument.Load(Path.Combine(dir, "_site", "blog", "feed.xml"));
+            var feedHtml = feed.Descendants().Single(element => element.Name.LocalName == "content").Value;
+            await Assert.That(feedHtml).Contains("https://example.org/docs/media/images/hero.svg?variant=small&amp;mode=detail#preview");
+            await Assert.That(feedHtml).Contains("https://example.org/docs/media/images/hero.svg 1x");
+            await Assert.That(feedHtml).Contains("poster=\"https://example.org/docs/media/images/poster.svg\"");
+            await Assert.That(feed.Descendants().Single(element => element.Name.LocalName == "link"
+                    && (string?)element.Attribute("rel") == "alternate")
+                .Attribute("href")!.Value).IsEqualTo("https://example.org/docs/blog/");
         }
         finally
         {

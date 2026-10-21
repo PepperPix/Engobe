@@ -209,6 +209,61 @@ public class TemplateRendererTests
     }
 
     [Test]
+    public async Task Render_PublicContextUsesDevelopmentAssetFallback()
+    {
+        var tempTheme = CreateTempTheme(
+            layout: "<html>{{ asset_url 'css/style.css' }}|{{ plugin_asset_url 'demo' 'js/a.js' }}|{{ page_asset_url 'hero.jpg' }}|{{ site.asset_prefix }}|{{ page.url }}|{{ page.content }}</html>",
+            layoutName: "default");
+
+        try
+        {
+            var collection = CreateTestCollection();
+            var item = CreateTestItem("<img src=\"/assets/images/hero.svg\">", collection);
+            var site = CreateTestSite(collection, basePath: "/docs", assetPrefix: "https://cdn.example.com/v2/media");
+            var shared = SharedRenderContext.Build(site, new Dictionary<string, IReadOnlyList<TaxonomyTerm>>());
+
+            var result = _renderer.Render(item, shared, site, tempTheme, []);
+
+            await Assert.That(result).Contains("/docs/assets/css/style.css");
+            await Assert.That(result).Contains("/docs/assets/plugins/demo/js/a.js");
+            await Assert.That(result).Contains("/docs/assets/content/posts/test-post/hero.jpg");
+            await Assert.That(result).Contains("/docs/assets/|/docs/blog/test-post/");
+            await Assert.That(result).Contains("src=\"/docs/assets/images/hero.svg\"");
+            await Assert.That(site.AssetPrefix).IsEqualTo("https://cdn.example.com/v2/media");
+            await Assert.That(item.HtmlContent).IsEqualTo("<img src=\"/assets/images/hero.svg\">");
+        }
+        finally
+        {
+            Directory.Delete(tempTheme, true);
+        }
+    }
+
+    [Test]
+    public async Task Render_RootRelativeEffectivePrefixIncludesBasePathOnce()
+    {
+        var tempTheme = CreateTempTheme(
+            layout: "<html>{{ asset_url 'logo.svg' }}|{{ site.asset_prefix }}</html>",
+            layoutName: "default");
+
+        try
+        {
+            var collection = CreateTestCollection();
+            var item = CreateTestItem("<p>Hello</p>", collection);
+            var site = CreateTestSite(collection, basePath: "/docs", assetPrefix: "/media/");
+            var shared = SharedRenderContext.Build(site, new Dictionary<string, IReadOnlyList<TaxonomyTerm>>());
+
+            var result = _renderer.Render(item, shared, site, tempTheme, []);
+
+            await Assert.That(result).Contains("/docs/media/logo.svg|/docs/media/");
+            await Assert.That(result).DoesNotContain("/docs/docs/");
+        }
+        finally
+        {
+            Directory.Delete(tempTheme, true);
+        }
+    }
+
+    [Test]
     public async Task Render_ProvidesBasePathVariableAndPrefixedPageUrl()
     {
         var tempTheme = CreateTempTheme(
@@ -391,11 +446,11 @@ public class TemplateRendererTests
         Collection = collection
     };
 
-    private static SiteConfiguration CreateTestSite(ContentGroup collection, string basePath = "/") => new()
+    private static SiteConfiguration CreateTestSite(ContentGroup collection, string basePath = "/", string assetPrefix = "/assets/") => new()
     {
         Title = "Test Site",
         BaseUrl = new UriBuilder(Uri.UriSchemeHttp, "localhost", 5555, basePath).Uri,
+        AssetPrefix = assetPrefix,
         Collections = new Dictionary<string, ContentGroup> { ["posts"] = collection }
     };
 }
-

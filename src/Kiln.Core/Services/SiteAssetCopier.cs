@@ -29,8 +29,7 @@ internal sealed class SiteAssetCopier(IImageOptimizer imageOptimizer, IAssetRefe
         var referencedImages = config.Images.Enabled && environment == BuildEnvironment.Production
             ? assetReferenceIndexBuilder.Build(allItems).Keys.ToHashSet(StringComparer.OrdinalIgnoreCase)
             : [];
-        var imageRenameManifest = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var imageCopyContext = new ImageCopyContext(outputDir, projectPath, config.Images, referencedImages, imageRenameManifest);
+        var imageCopyContext = new ImageCopyContext(outputDir, projectPath, config.Images, referencedImages, render.AssetManifest);
 
         // Copy static assets from site → _site/assets/ (overrides theme, warns on collision)
         var siteStaticDir = Path.Combine(projectPath, "static");
@@ -57,11 +56,6 @@ internal sealed class SiteAssetCopier(IImageOptimizer imageOptimizer, IAssetRefe
             CopyDirectory(pluginStaticDir, pluginAssetsDir, generatedFiles);
         }
 
-        // Rewrite HTML/CSS references for any images renamed by optimization (e.g. WebP
-        // conversion changing the extension) — must run before the fingerprint stage below,
-        // so hashes cover the final on-disk bytes.
-        if (imageRenameManifest.Count > 0)
-            AssetPipeline.RewriteReferences(outputDir, imageRenameManifest);
     }
 
     private static void CopyDirectory(string sourceDir, string destDir, HashSet<string>? generatedFiles)
