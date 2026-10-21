@@ -89,3 +89,17 @@ The built CLI passed production builds with CDN and local prefixes, a site base-
 Development builds used local unhashed URLs without changing configuration. Preview served the new CSS bytes under the site base path, rejected routing changes through an SSE restart error without changing any output file, recovered after configuration restoration, and adopted a custom local prefix after restart. CSS-only edits emitted the CSS update event. The temporary fixture was removed and both temporary preview instances were stopped.
 
 The initial pass had no Pagefind binary. The review correction pass completed the search-enabled CLI check with the installed Pagefind 1.5.2 binary as described above.
+
+### Cross-platform CI correction
+
+The first Windows CI run reported 16 failures. Fixture configuration used platform-native
+line endings but injected prefixes using LF-only matches. The fixtures now normalize line
+endings before text edits, with explicit LF/CRLF cases asserting the loaded prefix, base
+path, feed, and search settings. The cycle assertion accepts either rotation of the same
+closed cycle rather than depending on filesystem enumeration order. Atom diagnostics use
+the same web-path formatting as HTML and CSS diagnostics.
+
+Local validation passed all 699 tests in both Debug and the Release CI configuration
+(`--maximum-parallel-tests 4`), with no skips. The Release build had zero warnings/errors
+and inspection had zero findings. No timeouts, parallelism settings, or platform exclusions
+were changed. Windows confirmation remains subject to the next CI run.

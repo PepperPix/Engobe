@@ -359,10 +359,10 @@ internal static class AssetPipelineFinalizer
                 {
                     foreach (var attribute in new[] { "href", "src", "poster" })
                         if (element.GetAttribute(attribute) is { } reference)
-                            Check(reference, Path.GetRelativePath(outputDir, xmlFile));
+                            Check(reference, ToWebPath(outputDir, xmlFile));
                     if (element.GetAttribute("srcset") is { } srcset)
                         foreach (var reference in ExtractSrcsetUrls(srcset))
-                            Check(reference, Path.GetRelativePath(outputDir, xmlFile));
+                            Check(reference, ToWebPath(outputDir, xmlFile));
                 }
             }
         }
