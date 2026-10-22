@@ -20,4 +20,4 @@
 - [x] 3.2 Run the full `dotnet test` suite (without `rtk`) in `PepperPix/Kiln` and confirm all tests pass.
 - [x] 3.3 Run `jb inspectcode Kiln.slnx -e=WARNING -f=Text` with zero findings.
 - [x] 3.4 Run an end-to-end check in an isolated temporary directory: `kiln new`, create content with path and UUID parents, run `kiln build`, and check breadcrumbs, `page.section`, and navtree active states; also verify an invalid reference through `kiln serve` and remove only that test directory.
-- [ ] 3.5 Inspect `rtk git show --stat HEAD`; only expected Kiln code, test, and product documentation files may be included.
+- [x] 3.5 Inspect `rtk git show --stat HEAD`; only expected Kiln code, test, and product documentation files may be included.
