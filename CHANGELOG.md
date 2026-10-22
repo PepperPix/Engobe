@@ -1,3 +1,10 @@
+# [2.0.0-beta.6](https://github.com/PepperPix/Kiln/compare/v2.0.0-beta.5...v2.0.0-beta.6) (2026-10-22)
+
+
+### Features
+
+* **plugins:** verify NuGet package hashes ([#49](https://github.com/PepperPix/Kiln/issues/49)) ([373dfae](https://github.com/PepperPix/Kiln/commit/373dfae588a5233e3886619252f130f08f133433))
+
 # [2.0.0-beta.5](https://github.com/PepperPix/Kiln/compare/v2.0.0-beta.4...v2.0.0-beta.5) (2026-10-22)
 
 
