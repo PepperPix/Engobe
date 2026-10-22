@@ -1,9 +1,67 @@
 namespace Kiln.Core.Tests.Services;
 
+using Kiln.Abstractions;
 using Kiln.Services;
 
 public class HomepageEngineTests
 {
+    [Test]
+    [Arguments(false, BuildEnvironment.Development)]
+    [Arguments(true, BuildEnvironment.Development)]
+    [Arguments(false, BuildEnvironment.Production)]
+    [Arguments(true, BuildEnvironment.Production)]
+    public async Task BuildAsync_WithoutHome_WarnsWithoutInferringIndexPage(bool hasIndexPage, BuildEnvironment environment)
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"kiln-no-home-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(dir, "content", "posts"));
+        Directory.CreateDirectory(Path.Combine(dir, "themes", "default", "layouts"));
+
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(dir, "site.yaml"),
+                """
+                title: Test Site
+                baseUrl: http://localhost:5555
+                collections:
+                  posts:
+                    directory: content/posts
+                    permalink: /blog/:slug/
+                """);
+            await File.WriteAllTextAsync(Path.Combine(dir, "content", "posts", "post.md"),
+                """
+                ---
+                title: Post
+                ---
+                Post body.
+                """);
+            await File.WriteAllTextAsync(Path.Combine(dir, "themes", "default", "layouts", "default.html"),
+                "<html>{{ page.content }}</html>");
+
+            if (hasIndexPage)
+            {
+                await File.WriteAllTextAsync(Path.Combine(dir, "content", "index.md"),
+                    """
+                    ---
+                    title: Home
+                    ---
+                    Not an implicit homepage.
+                    """);
+            }
+
+            var result = await CreateBuilder().BuildAsync(dir, false, environment, CancellationToken.None);
+
+            await Assert.That(result.Errors).IsEmpty();
+            await Assert.That(result.Success).IsTrue();
+            await Assert.That(result.Warnings.Count(warning => warning == "site root `/` is empty")).IsEqualTo(1);
+            await Assert.That(File.Exists(Path.Combine(dir, "_site", "index.html"))).IsFalse();
+            await Assert.That(File.Exists(Path.Combine(dir, "_site", "blog", "post", "index.html"))).IsTrue();
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
     [Test]
     public async Task BuildAsync_HomePageMode_RendersRootIndexWithLimitFilter()
     {
@@ -61,6 +119,7 @@ public class HomepageEngineTests
             var homeHtml = await File.ReadAllTextAsync(homeHtmlPath);
             await Assert.That(homeHtml).Contains("Welcome home");
             await Assert.That(homeHtml).Contains("|XXXXX");
+            await Assert.That(result.Warnings.Contains("site root `/` is empty")).IsFalse();
         }
         finally
         {
@@ -117,6 +176,7 @@ public class HomepageEngineTests
             await Assert.That(File.Exists(Path.Combine(dir, "_site", "index.html"))).IsTrue();
             await Assert.That(File.Exists(Path.Combine(dir, "_site", "blog", "index.html"))).IsTrue();
             await Assert.That(File.Exists(Path.Combine(dir, "_site", "blog", "page", "2", "index.html"))).IsFalse();
+            await Assert.That(result.Warnings.Contains("site root `/` is empty")).IsFalse();
 
             var homeHtml = await File.ReadAllTextAsync(Path.Combine(dir, "_site", "index.html"));
             var collectionHtml = await File.ReadAllTextAsync(Path.Combine(dir, "_site", "blog", "index.html"));
@@ -177,6 +237,7 @@ public class HomepageEngineTests
             await Assert.That(File.Exists(Path.Combine(dir, "_site", "page", "2", "index.html"))).IsTrue();
             await Assert.That(File.Exists(Path.Combine(dir, "_site", "blog", "post-1", "index.html"))).IsTrue();
             await Assert.That(File.Exists(Path.Combine(dir, "_site", "blog", "page", "2", "index.html"))).IsFalse();
+            await Assert.That(result.Warnings.Contains("site root `/` is empty")).IsFalse();
         }
         finally
         {
@@ -221,6 +282,7 @@ public class HomepageEngineTests
 
             await Assert.That(result.Success).IsFalse();
             await Assert.That(result.Errors.Any(e => e.Contains("home.collection requires 'paginate'"))).IsTrue();
+            await Assert.That(result.Warnings.Contains("site root `/` is empty")).IsFalse();
         }
         finally
         {
@@ -285,6 +347,7 @@ public class HomepageEngineTests
         var permalinkGenerator = new PermalinkGenerator();
         var configLoader = new SiteConfigLoader();
         var pluginLoader = new PluginLoader();
-        return new SiteBuilder(contentReader, templateRenderer, permalinkGenerator, configLoader, pluginLoader, [], new SkiaSharpImageOptimizer(), new AssetReferenceIndexBuilder());
+        return new SiteBuilder(contentReader, templateRenderer, permalinkGenerator, configLoader, pluginLoader,
+            [new NuglifyAssetMinifier(), new NoOpAssetMinifier()], new SkiaSharpImageOptimizer(), new AssetReferenceIndexBuilder());
     }
 }
