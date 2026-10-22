@@ -24,3 +24,14 @@ When `home.collection` points to a collection with positive `paginate` and at le
 #### Scenario: Move a blog collection to the root
 - **WHEN** `home.collection: posts` is configured with positive `paginate` for the collection
 - **THEN** Kiln SHALL output the first index page at `/` and subsequent pages at `/page/<nummer>/`, while individual posts retain their collection permalinks.
+
+### Requirement: Report a missing homepage as a root warning
+When `site.yaml` defines no `home` block, Kiln SHALL issue a warning that the site root `/` is empty and not silently report the build as fully rendered without that notice.
+
+#### Scenario: Build a site without homepage configuration
+- **WHEN** a valid site project without a `home` block is built
+- **THEN** the build SHALL contain the warning ``site root `/` is empty`` and otherwise remain successful.
+
+#### Scenario: Configure an explicit homepage
+- **WHEN** a valid `home.page` or `home.collection` block is configured
+- **THEN** Kiln SHALL not issue the missing-homepage warning.
