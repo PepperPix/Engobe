@@ -1,3 +1,10 @@
+# [2.0.0-beta.2](https://github.com/PepperPix/Kiln/compare/v2.0.0-beta.1...v2.0.0-beta.2) (2026-10-22)
+
+
+### Features
+
+* **collections:** render unpaginated indexes ([f5077bc](https://github.com/PepperPix/Kiln/commit/f5077bcd4ce5878d6cfe65192ed5f5133c63c8e7))
+
 # [2.0.0-beta.1](https://github.com/PepperPix/Kiln/compare/v1.3.0-beta.9...v2.0.0-beta.1) (2026-10-21)
 
 
