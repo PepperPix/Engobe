@@ -106,21 +106,25 @@ public class SiteBuilderImageOptimizationTests
 
         try
         {
-            var originalBytes = await File.ReadAllBytesAsync(Path.Combine(dir, "content", "posts", "bundle-post", "photo.png"));
+            var bundleDir = Path.Combine(dir, "content", "posts", "guides", "advanced", "bundle-post");
+            var originalBytes = await File.ReadAllBytesAsync(Path.Combine(bundleDir, "images", "referenced.png"));
+            var unreferencedBytes = await File.ReadAllBytesAsync(Path.Combine(bundleDir, "images", "unreferenced.png"));
 
             var builder = CreateBuilder();
             var result = await builder.BuildAsync(dir, false, BuildEnvironment.Production, CancellationToken.None);
 
             await Assert.That(result.Success).IsTrue();
 
-            var outputPath = Path.Combine(dir, "_site", "assets", "content", "posts", "bundle-post", "photo.png");
+            var outputPath = Path.Combine(dir, "_site", "assets", "content", "posts", "guides", "advanced", "bundle-post", "images", "referenced.png");
             var outputBytes = await File.ReadAllBytesAsync(outputPath);
             await Assert.That(outputBytes.SequenceEqual(originalBytes)).IsFalse();
 
             using var decoded = SKBitmap.Decode(outputBytes);
             await Assert.That(decoded.Width).IsEqualTo(TestMaxWidth);
-            var html = await File.ReadAllTextAsync(Path.Combine(dir, "_site", "blog", "bundle-post", "index.html"));
-            await Assert.That(html).Contains(assetPrefix + "content/posts/bundle-post/photo.png");
+            var unreferencedOutputPath = Path.Combine(dir, "_site", "assets", "content", "posts", "guides", "advanced", "bundle-post", "images", "unreferenced.png");
+            await Assert.That((await File.ReadAllBytesAsync(unreferencedOutputPath)).SequenceEqual(unreferencedBytes)).IsTrue();
+            var html = await File.ReadAllTextAsync(Path.Combine(dir, "_site", "blog", "guides", "advanced", "bundle-post", "index.html"));
+            await Assert.That(html).Contains(assetPrefix + "content/posts/guides/advanced/bundle-post/images/referenced.png?v=2#detail");
         }
         finally
         {
@@ -137,18 +141,18 @@ public class SiteBuilderImageOptimizationTests
 
         try
         {
-            var originalBytes = await File.ReadAllBytesAsync(Path.Combine(dir, "content", "posts", "opted-out", "opted-out.png"));
+            var originalBytes = await File.ReadAllBytesAsync(Path.Combine(dir, "content", "posts", "guides", "advanced", "opted-out", "images", "opted-out.png"));
 
             var builder = CreateBuilder();
             var result = await builder.BuildAsync(dir, false, BuildEnvironment.Production, CancellationToken.None);
 
             await Assert.That(result.Success).IsTrue();
 
-            var outputPath = Path.Combine(dir, "_site", "assets", "content", "posts", "opted-out", "opted-out.png");
+            var outputPath = Path.Combine(dir, "_site", "assets", "content", "posts", "guides", "advanced", "opted-out", "images", "opted-out.png");
             var outputBytes = await File.ReadAllBytesAsync(outputPath);
             await Assert.That(outputBytes.SequenceEqual(originalBytes)).IsTrue();
-            var html = await File.ReadAllTextAsync(Path.Combine(dir, "_site", "blog", "opted-out", "index.html"));
-            await Assert.That(html).Contains(assetPrefix + "content/posts/opted-out/opted-out.png");
+            var html = await File.ReadAllTextAsync(Path.Combine(dir, "_site", "blog", "guides", "advanced", "opted-out", "index.html"));
+            await Assert.That(html).Contains(assetPrefix + "content/posts/guides/advanced/opted-out/images/opted-out.png");
         }
         finally
         {
@@ -161,11 +165,18 @@ public class SiteBuilderImageOptimizationTests
     [Arguments("https://cdn.example.com/v2/media/")]
     public async Task BuildAsync_Production_ExcludeGlob_SkipsMatchingImageEvenWhenReferenced(string assetPrefix)
     {
-        var dir = CreateSite(exclude: ["static/img/excluded.png"], assetPrefix: assetPrefix);
+        var dir = CreateSite(
+            exclude:
+            [
+                "static/img/excluded.png",
+                "content/posts/guides/advanced/bundle-post/images/excluded.png"
+            ],
+            assetPrefix: assetPrefix);
 
         try
         {
             var originalBytes = await File.ReadAllBytesAsync(Path.Combine(dir, "static", "img", "excluded.png"));
+            var originalBundleBytes = await File.ReadAllBytesAsync(Path.Combine(dir, "content", "posts", "guides", "advanced", "bundle-post", "images", "excluded.png"));
 
             var builder = CreateBuilder();
             var result = await builder.BuildAsync(dir, false, BuildEnvironment.Production, CancellationToken.None);
@@ -175,8 +186,12 @@ public class SiteBuilderImageOptimizationTests
             var outputPath = Path.Combine(dir, "_site", "assets", "img", "excluded.png");
             var outputBytes = await File.ReadAllBytesAsync(outputPath);
             await Assert.That(outputBytes.SequenceEqual(originalBytes)).IsTrue();
+            var bundleOutputPath = Path.Combine(dir, "_site", "assets", "content", "posts", "guides", "advanced", "bundle-post", "images", "excluded.png");
+            await Assert.That((await File.ReadAllBytesAsync(bundleOutputPath)).SequenceEqual(originalBundleBytes)).IsTrue();
             var html = await File.ReadAllTextAsync(Path.Combine(dir, "_site", "blog", "hello", "index.html"));
             await Assert.That(html).Contains(assetPrefix + "img/excluded.png");
+            var bundleHtml = await File.ReadAllTextAsync(Path.Combine(dir, "_site", "blog", "guides", "advanced", "bundle-post", "index.html"));
+            await Assert.That(bundleHtml).Contains(assetPrefix + "content/posts/guides/advanced/bundle-post/images/excluded.png");
         }
         finally
         {
@@ -214,6 +229,32 @@ public class SiteBuilderImageOptimizationTests
     }
 
     [Test]
+    public async Task BuildAsync_Production_OptimizerError_UsesUnoptimizedNestedBundleImageAndWarns()
+    {
+        var dir = CreateSite();
+        var originalBytes = await File.ReadAllBytesAsync(Path.Combine(dir, "content", "posts", "guides", "advanced", "bundle-post", "images", "referenced.png"));
+
+        try
+        {
+            var result = await CreateBuilder(new FailingImageOptimizer()).BuildAsync(
+                dir,
+                false,
+                BuildEnvironment.Production,
+                CancellationToken.None);
+
+            await Assert.That(result.Success).IsTrue();
+            var outputPath = Path.Combine(dir, "_site", "assets", "content", "posts", "guides", "advanced", "bundle-post", "images", "referenced.png");
+            await Assert.That((await File.ReadAllBytesAsync(outputPath)).SequenceEqual(originalBytes)).IsTrue();
+            var referencedImagePath = Path.Combine("images", "referenced.png");
+            await Assert.That(result.Warnings.Any(warning => warning.Contains(referencedImagePath, StringComparison.Ordinal))).IsTrue();
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Test]
     [Arguments("/assets/")]
     [Arguments("https://cdn.example.com/v2/media/")]
     public async Task BuildAsync_Production_WebpEnabled_ChangesExtensionAndRewritesHtmlReference(string assetPrefix)
@@ -235,11 +276,11 @@ public class SiteBuilderImageOptimizationTests
             var postHtml = await File.ReadAllTextAsync(Path.Combine(dir, "_site", "blog", "hello", "index.html"));
             await Assert.That(postHtml).Contains(assetPrefix + "img/referenced.webp");
             await Assert.That(postHtml).DoesNotContain("/assets/img/referenced.png");
-            var bundleOutput = Path.Combine(dir, "_site", "assets", "content", "posts", "bundle-post", "photo.webp");
+            var bundleOutput = Path.Combine(dir, "_site", "assets", "content", "posts", "guides", "advanced", "bundle-post", "images", "referenced.webp");
             using var decodedBundle = SKBitmap.Decode(await File.ReadAllBytesAsync(bundleOutput));
             await Assert.That(decodedBundle.Width).IsEqualTo(TestMaxWidth);
-            var bundleHtml = await File.ReadAllTextAsync(Path.Combine(dir, "_site", "blog", "bundle-post", "index.html"));
-            await Assert.That(bundleHtml).Contains(assetPrefix + "content/posts/bundle-post/photo.webp");
+            var bundleHtml = await File.ReadAllTextAsync(Path.Combine(dir, "_site", "blog", "guides", "advanced", "bundle-post", "index.html"));
+            await Assert.That(bundleHtml).Contains(assetPrefix + "content/posts/guides/advanced/bundle-post/images/referenced.webp?v=2#detail");
         }
         finally
         {
@@ -250,8 +291,10 @@ public class SiteBuilderImageOptimizationTests
     private static string CreateSite(bool webp = false, IReadOnlyList<string>? exclude = null, string assetPrefix = "/assets/")
     {
         var dir = Path.Combine(Path.GetTempPath(), $"kiln-image-opt-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(Path.Combine(dir, "content", "posts", "bundle-post"));
-        Directory.CreateDirectory(Path.Combine(dir, "content", "posts", "opted-out"));
+        var bundlePostDir = Path.Combine(dir, "content", "posts", "guides", "advanced", "bundle-post");
+        var optedOutDir = Path.Combine(dir, "content", "posts", "guides", "advanced", "opted-out");
+        Directory.CreateDirectory(Path.Combine(bundlePostDir, "images"));
+        Directory.CreateDirectory(Path.Combine(optedOutDir, "images"));
         Directory.CreateDirectory(Path.Combine(dir, "static", "img"));
         Directory.CreateDirectory(Path.Combine(dir, "themes", "default", "layouts"));
         Directory.CreateDirectory(Path.Combine(dir, "themes", "default", "static", "img"));
@@ -291,26 +334,30 @@ public class SiteBuilderImageOptimizationTests
             ![Excluded](/assets/img/excluded.png)
             """);
 
-        File.WriteAllText(Path.Combine(dir, "content", "posts", "bundle-post", "index.md"),
+        File.WriteAllText(Path.Combine(bundlePostDir, "index.md"),
             """
             ---
             title: Bundle Post
             date: 2026-01-01
             ---
-            ![Bundle Photo](photo.png)
-            """);
-        File.WriteAllBytes(Path.Combine(dir, "content", "posts", "bundle-post", "photo.png"), TestPng);
+            ![Bundle Photo](images/referenced.png?v=2#detail)
 
-        File.WriteAllText(Path.Combine(dir, "content", "posts", "opted-out", "index.md"),
+            ![Excluded Bundle Photo](images/excluded.png)
+            """);
+        File.WriteAllBytes(Path.Combine(bundlePostDir, "images", "referenced.png"), TestPng);
+        File.WriteAllBytes(Path.Combine(bundlePostDir, "images", "unreferenced.png"), TestPng);
+        File.WriteAllBytes(Path.Combine(bundlePostDir, "images", "excluded.png"), TestPng);
+
+        File.WriteAllText(Path.Combine(optedOutDir, "index.md"),
             """
             ---
             title: Opted Out
             date: 2026-01-01
             imageOptimization: false
             ---
-            ![Opted-out Image](opted-out.png)
+            ![Opted-out Image](images/opted-out.png)
             """);
-        File.WriteAllBytes(Path.Combine(dir, "content", "posts", "opted-out", "opted-out.png"), TestPng);
+        File.WriteAllBytes(Path.Combine(optedOutDir, "images", "opted-out.png"), TestPng);
 
         File.WriteAllBytes(Path.Combine(dir, "static", "img", "referenced.png"), TestPng);
         File.WriteAllBytes(Path.Combine(dir, "static", "img", "unreferenced.png"), TestPng);
@@ -372,5 +419,13 @@ public class SiteBuilderImageOptimizationTests
             OptimizeCallCount++;
             return inner.Optimize(sourceBytes, sourceExtension, settings);
         }
+    }
+
+    private sealed class FailingImageOptimizer : IImageOptimizer
+    {
+        public bool CanOptimize(string extension) => extension.Equals(".png", StringComparison.OrdinalIgnoreCase);
+
+        public ImageOptimizationOutput Optimize(byte[] sourceBytes, string sourceExtension, ImageOptimizationSettings settings) =>
+            throw new InvalidOperationException("test optimizer failure");
     }
 }

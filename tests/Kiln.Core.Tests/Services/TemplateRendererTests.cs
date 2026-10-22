@@ -318,6 +318,38 @@ public class TemplateRendererTests
     }
 
     [Test]
+    public async Task Render_PageAssetUrl_MatchesNestedMarkdownImageWithCustomSlugAndBasePath()
+    {
+        const string canonicalAssetPath = "/assets/content/posts/guides/advanced/custom-install/images/screens/x.jpg";
+        var tempTheme = CreateTempTheme(
+            layout: "<html>{{ page.content }}|{{ page_asset_url 'images/screens/x.jpg' }}</html>",
+            layoutName: "default");
+
+        try
+        {
+            var collection = CreateTestCollection();
+            var item = CreateTestItem(
+                $"<img src=\"{canonicalAssetPath}\" alt=\"Diagram\">",
+                collection,
+                sectionPath: "guides/advanced",
+                slug: "custom-install");
+            var site = CreateTestSite(collection, basePath: "/docs");
+            var shared = SharedRenderContext.Build(site, new Dictionary<string, IReadOnlyList<TaxonomyTerm>>());
+
+            var result = _renderer.Render(item, shared, site, tempTheme, []);
+            const string expectedPublicPath = "/docs/assets/content/posts/guides/advanced/custom-install/images/screens/x.jpg";
+
+            await Assert.That(result).Contains($"src=\"{expectedPublicPath}\"");
+            await Assert.That(result).Contains($"|{expectedPublicPath}");
+            await Assert.That(result).DoesNotContain("/guides/advanced/guides/advanced/");
+        }
+        finally
+        {
+            Directory.Delete(tempTheme, true);
+        }
+    }
+
+    [Test]
     public async Task Render_AssetUrlFunction_RespectsConfiguredBasePath()
     {
         var tempTheme = CreateTempTheme(
@@ -563,13 +595,18 @@ public class TemplateRendererTests
         }
     }
 
-    private static ContentItem CreateTestItem(string htmlContent, ContentGroup collection, string? layout = null, string sectionPath = "") => new()
+    private static ContentItem CreateTestItem(
+        string htmlContent,
+        ContentGroup collection,
+        string? layout = null,
+        string sectionPath = "",
+        string slug = "test-post") => new()
     {
         SourcePath = "/test/content/test.md",
         RelativePath = "test.md",
         Title = "Test Post",
         Date = new DateTime(2026, 6, 17),
-        Slug = "test-post",
+        Slug = slug,
         SectionPath = sectionPath,
         Layout = layout,
         RawContent = "# Test",

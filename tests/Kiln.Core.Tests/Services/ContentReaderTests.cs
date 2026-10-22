@@ -522,6 +522,118 @@ public class ContentReaderTests
     }
 
     [Test]
+    public async Task ReadCollection_LeafBundle_NestedMarkdownDoesNotChangeBundleOrSections()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"kiln-test-{Guid.NewGuid():N}");
+        var bundleDir = Path.Combine(tempDir, "outer");
+        var nestedBundleDir = Path.Combine(bundleDir, "child");
+        var notesDir = Path.Combine(bundleDir, "notes");
+        var manualDir = Path.Combine(bundleDir, "images", "manual");
+        var sectionDir = Path.Combine(tempDir, "guides", "advanced", "install");
+
+        await WriteMarkdownAsync(Path.Combine(bundleDir, "index.md"), "title: Outer").ConfigureAwait(false);
+        await WriteMarkdownAsync(Path.Combine(nestedBundleDir, "index.md"), "title: Nested").ConfigureAwait(false);
+        await File.WriteAllTextAsync(Path.Combine(nestedBundleDir, "photo.png"), "image").ConfigureAwait(false);
+        await WriteMarkdownAsync(Path.Combine(notesDir, "article.md"), "title: Article").ConfigureAwait(false);
+        await File.WriteAllTextAsync(Path.Combine(notesDir, "data.zip"), "archive").ConfigureAwait(false);
+        await WriteMarkdownAsync(Path.Combine(manualDir, "README.MD"), "title: Readme").ConfigureAwait(false);
+        await File.WriteAllTextAsync(Path.Combine(manualDir, "diagram.svg"), "image").ConfigureAwait(false);
+        await WriteMarkdownAsync(Path.Combine(sectionDir, "index.md"), "title: Install\nslug: install-guide").ConfigureAwait(false);
+
+        try
+        {
+            var result = _reader.ReadCollection(MakeCollection("posts", tempDir), tempDir);
+
+            await Assert.That(result.Count).IsEqualTo(2);
+            var outer = result.Single(static item => item.Slug == "outer");
+            await Assert.That(outer.SectionPath).IsEqualTo("");
+            var install = result.Single(static item => item.Slug == "install-guide");
+            await Assert.That(install.SectionPath).IsEqualTo(Path.Combine("guides", "advanced").Replace(Path.DirectorySeparatorChar, '/'));
+            await Assert.That(result.Any(static item => item.Slug == "child" || item.Slug == "article" || item.Slug == "README")).IsFalse();
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Test]
+    public async Task ReadCollection_PageBundleReferences_ResolveOnlyAllowedLocalAssets()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"kiln-test-{Guid.NewGuid():N}");
+        var bundleDir = Path.Combine(tempDir, "post");
+        var hiddenDir = Path.Combine(bundleDir, ".hidden");
+        var linkedTargetDir = Path.Combine(tempDir, "linked-target");
+        Directory.CreateDirectory(hiddenDir);
+        Directory.CreateDirectory(linkedTargetDir);
+
+        await File.WriteAllTextAsync(Path.Combine(bundleDir, "index.md"),
+            """
+            ---
+            title: Bundle
+            ---
+            ![Normalized](./images/screens/../screens/x.jpg?v=2#detail)
+            ![Nested](child/photo.png)
+            ![Missing](images/missing.jpg)
+            ![Markdown](child/index.md)
+            ![Hidden](.hidden/photo.png)
+            ![Linked file](linked-file.png)
+            ![Linked directory](linked-directory/inside.png)
+            ![Escape](../outside.png)
+
+            [Download](./downloads/setup.zip?download=1#file)
+            [README](images/manual/README.MD)
+            [Diagram](images/manual/diagram.svg)
+            [Child asset](child/photo.png)
+            [Anchor](#details)
+            [External](https://example.com/file.zip)
+            [Root relative](/assets/shared/file.zip)
+            """).ConfigureAwait(false);
+        await WriteBundleFileAsync(bundleDir, "images/screens/x.jpg").ConfigureAwait(false);
+        await WriteBundleFileAsync(bundleDir, "downloads/setup.zip").ConfigureAwait(false);
+        await WriteBundleFileAsync(bundleDir, "child/index.md", "not a page").ConfigureAwait(false);
+        await WriteBundleFileAsync(bundleDir, "child/photo.png").ConfigureAwait(false);
+        await WriteBundleFileAsync(bundleDir, "images/manual/README.MD", "not a page").ConfigureAwait(false);
+        await WriteBundleFileAsync(bundleDir, "images/manual/diagram.svg").ConfigureAwait(false);
+        await File.WriteAllTextAsync(Path.Combine(hiddenDir, "photo.png"), "hidden").ConfigureAwait(false);
+        await File.WriteAllTextAsync(Path.Combine(tempDir, "outside.png"), "outside").ConfigureAwait(false);
+        await File.WriteAllTextAsync(Path.Combine(linkedTargetDir, "inside.png"), "linked").ConfigureAwait(false);
+        await File.WriteAllTextAsync(Path.Combine(tempDir, "linked-file.png"), "linked file").ConfigureAwait(false);
+        File.CreateSymbolicLink(Path.Combine(bundleDir, "linked-file.png"), Path.Combine(tempDir, "linked-file.png"));
+        Directory.CreateSymbolicLink(Path.Combine(bundleDir, "linked-directory"), linkedTargetDir);
+
+        try
+        {
+            var warnings = new System.Collections.ObjectModel.Collection<string>();
+            var item = _reader.ReadCollection(MakeCollection("posts", tempDir), tempDir, warnings: warnings).Single();
+            var html = item.HtmlContent;
+            const string assetBase = "/assets/content/posts/post/";
+
+            await Assert.That(html).Contains($"src=\"{assetBase}images/screens/x.jpg?v=2#detail\"");
+            await Assert.That(html).Contains($"src=\"{assetBase}child/photo.png\"");
+            await Assert.That(html).Contains($"src=\"{assetBase}images/missing.jpg\"");
+            await Assert.That(html).Contains($"href=\"{assetBase}downloads/setup.zip?download=1#file\"");
+            await Assert.That(html).Contains($"href=\"{assetBase}child/photo.png\"");
+            await Assert.That(html).Contains("src=\"child/index.md\"");
+            await Assert.That(html).Contains("href=\"images/manual/README.MD\"");
+            await Assert.That(html).Contains($"href=\"{assetBase}images/manual/diagram.svg\"");
+            await Assert.That(html).Contains("src=\".hidden/photo.png\"");
+            await Assert.That(html).Contains("src=\"linked-file.png\"");
+            await Assert.That(html).Contains("src=\"linked-directory/inside.png\"");
+            await Assert.That(html).Contains("src=\"../outside.png\"");
+            await Assert.That(html).Contains("href=\"#details\"");
+            await Assert.That(html).Contains("href=\"https://example.com/file.zip\"");
+            await Assert.That(html).Contains("href=\"/assets/shared/file.zip\"");
+            await Assert.That(warnings.Any(static warning => warning.Contains("child/index.md", StringComparison.Ordinal))).IsTrue();
+            await Assert.That(warnings.Any(static warning => warning.Contains("images/manual/README.MD", StringComparison.Ordinal))).IsTrue();
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Test]
     public async Task ReadCollection_SectionWithoutIndexMd_IsRecursed()
     {
         var tempDir = Path.Combine(Path.GetTempPath(), $"kiln-test-{Guid.NewGuid():N}");
@@ -751,6 +863,19 @@ public class ContentReaderTests
         Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, fileName), content);
         return dir;
+    }
+
+    private static async Task WriteMarkdownAsync(string path, string frontMatter)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await File.WriteAllTextAsync(path, $"---\n{frontMatter}\n---\ncontent").ConfigureAwait(false);
+    }
+
+    private static async Task WriteBundleFileAsync(string bundleDirectory, string relativePath, string content = "asset")
+    {
+        var path = Path.Combine(bundleDirectory, relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await File.WriteAllTextAsync(path, content).ConfigureAwait(false);
     }
 
     private static ContentGroup MakeCollection(string name, string directory, string sort = "none", string[]? taxonomies = null, int teaserWords = 55) =>

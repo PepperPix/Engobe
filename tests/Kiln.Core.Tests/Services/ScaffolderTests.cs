@@ -28,8 +28,17 @@ public class ScaffolderTests
             await Assert.That(result.CreatedFiles).Contains("themes/default/partials/recent-posts.html");
             await Assert.That(result.CreatedFiles).Contains("themes/default/partials/search.html");
             await Assert.That(result.CreatedFiles).Contains("themes/default/static/js/kiln-search.js");
+            await Assert.That(result.CreatedFiles).Contains("content/posts/06-page-bundles-and-images/images/screens/install.svg");
+            await Assert.That(result.CreatedFiles).Contains("content/posts/06-page-bundles-and-images/downloads/sample.csv");
             var searchScript = await File.ReadAllTextAsync(Path.Combine(result.ProjectPath, "themes", "default", "static", "js", "kiln-search.js"));
             await Assert.That(searchScript).Contains("data-pagefind-module");
+            var bundleDirectory = Path.Combine(result.ProjectPath, "content", "posts", "06-page-bundles-and-images");
+            var bundleContent = await File.ReadAllTextAsync(Path.Combine(bundleDirectory, "index.md"));
+            await Assert.That(bundleContent).Contains("![Installation screen](images/screens/install.svg)");
+            await Assert.That(bundleContent).Contains("[Download sample data](downloads/sample.csv)");
+            await Assert.That(bundleContent).Contains("Directories inside a page bundle are asset folders, not sections.");
+            await Assert.That(File.Exists(Path.Combine(bundleDirectory, "images", "screens", "install.svg"))).IsTrue();
+            await Assert.That(File.Exists(Path.Combine(bundleDirectory, "downloads", "sample.csv"))).IsTrue();
 
             var siteYamlPath = Path.Combine(result.ProjectPath, "site.yaml");
             var contentIndexPath = Path.Combine(result.ProjectPath, "content", "index.md");

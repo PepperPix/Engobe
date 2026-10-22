@@ -28,6 +28,17 @@ public sealed partial class MarkdownProcessor : IMarkdownProcessor
         return html;
     }
 
+    internal static string ToBundleHtml(
+        IMarkdownProcessor markdownProcessor,
+        string markdown,
+        Func<string, bool, string?> resolveBundleReference)
+    {
+        ArgumentNullException.ThrowIfNull(markdownProcessor);
+        ArgumentNullException.ThrowIfNull(resolveBundleReference);
+        var html = markdownProcessor.ToHtml(markdown);
+        return RewriteBundleReferences(html, resolveBundleReference);
+    }
+
     public string ToPlainText(string markdown)
     {
         return Markdown.ToPlainText(markdown, _pipeline).Trim();
@@ -75,6 +86,9 @@ public sealed partial class MarkdownProcessor : IMarkdownProcessor
     [GeneratedRegex("""(<img\b[^>]*?\bsrc=")(?!https?://|//)(?!/)([^"]*)(")""", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex RelativeImgSrcRegex();
 
+    [GeneratedRegex("""(<img\b[^>]*?\bsrc="|<a\b[^>]*?\bhref=")([^"]*)(")""", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    private static partial Regex BundleReferenceAttributeRegex();
+
     private const char UrlSeparatorChar = '/';
     private const string DotSlashPrefix = "./";
 
@@ -89,6 +103,21 @@ public sealed partial class MarkdownProcessor : IMarkdownProcessor
             if (relativeSrc.StartsWith(DotSlashPrefix, StringComparison.Ordinal))
                 relativeSrc = relativeSrc[DotSlashPrefix.Length..];
             return openQuote + basePath + relativeSrc + closeQuote;
+        });
+    }
+
+    private static string RewriteBundleReferences(string html, Func<string, bool, string?> resolveBundleReference)
+    {
+        return BundleReferenceAttributeRegex().Replace(html, match =>
+        {
+            var attributePrefix = match.Groups[1].Value;
+            var destination = match.Groups[2].Value;
+            var closingQuote = match.Groups[3].Value;
+            var isImage = attributePrefix.StartsWith("<img", StringComparison.OrdinalIgnoreCase);
+            var resolvedDestination = resolveBundleReference(destination, isImage);
+            return resolvedDestination is null
+                ? match.Value
+                : attributePrefix + resolvedDestination + closingQuote;
         });
     }
 }

@@ -33,17 +33,18 @@ public sealed partial class AssetReferenceIndexBuilder : IAssetReferenceIndexBui
                 if (!src.StartsWith("/assets/", StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                if (!refsByPath.TryGetValue(src, out var refs))
+                var localPath = RemoveQueryAndFragment(src);
+                if (!refsByPath.TryGetValue(localPath, out var refs))
                 {
                     refs = [];
-                    refsByPath[src] = refs;
-                    seenSourcePathsByPath[src] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    refsByPath[localPath] = refs;
+                    seenSourcePathsByPath[localPath] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 }
 
                 // Collapse multiple <img> tags in the same item pointing at the same path down
                 // to a single ContentItemRef — callers care about "which items reference this
                 // asset", not "how many times".
-                if (seenSourcePathsByPath[src].Add(item.SourcePath))
+                if (seenSourcePathsByPath[localPath].Add(item.SourcePath))
                     refs.Add(new ContentItemRef(item.Title, item.SourcePath, item.Collection.Name));
             }
         }
@@ -53,6 +54,12 @@ public sealed partial class AssetReferenceIndexBuilder : IAssetReferenceIndexBui
             result[path] = refs;
 
         return result;
+    }
+
+    private static string RemoveQueryAndFragment(string path)
+    {
+        var suffixStart = path.IndexOfAny(['?', '#']);
+        return suffixStart < 0 ? path : path[..suffixStart];
     }
 
     [GeneratedRegex(
