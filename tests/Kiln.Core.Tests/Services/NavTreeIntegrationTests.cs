@@ -5,6 +5,94 @@ using Kiln.Services;
 public class NavTreeIntegrationTests
 {
     [Test]
+    [Arguments("guides/getting-started.md", "")]
+    [Arguments("guides/getting-started.md", "/site")]
+    [Arguments("a869d67a-e4e1-48c5-a08c-75241df633d1", "")]
+    [Arguments("a869d67a-e4e1-48c5-a08c-75241df633d1", "/site")]
+    public async Task Build_ParentOverrides_ProjectEffectiveTreeAndRetainUrlPrefixAncestors(string reference, string basePath)
+    {
+        var dir = CreateSiteWithNavLayout();
+        try
+        {
+            var configPath = Path.Combine(dir, "site.yaml");
+            var yaml = await File.ReadAllTextAsync(configPath);
+            await File.WriteAllTextAsync(configPath, yaml.Replace("http://localhost:5555", $"http://localhost:5555{basePath}", StringComparison.Ordinal));
+            await File.WriteAllTextAsync(Path.Combine(dir, "content", "guides", "getting-started.md"),
+                "---\ntitle: Getting Started\nid: a869d67a-e4e1-48c5-a08c-75241df633d1\nparent: top.md\n---\nParent");
+            await File.WriteAllTextAsync(Path.Combine(dir, "content", "guides", "advanced", "config.md"),
+                $"---\ntitle: Config\nparent: {reference}\nurl: /detached/config/\n---\nChild");
+            await File.WriteAllTextAsync(Path.Combine(dir, "content", "guides", "remaining.md"), "---\ntitle: Remaining\n---\nSibling");
+            Directory.CreateDirectory(Path.Combine(dir, "content", "detached"));
+            await File.WriteAllTextAsync(Path.Combine(dir, "content", "detached", "other.md"), "---\ntitle: Other\n---\nPrefix sibling");
+            await File.WriteAllTextAsync(Path.Combine(dir, "themes", "default", "layouts", "default.html"),
+                """
+                ROOT:{{ navtree.docs.size }};{{ if site.navtree }}WRONG_BINDING{{ end }}
+                {{ for n in navtree.docs }}
+                NODE:{{ n.title }}|{{ n.url }}|{{ n.is_active }}|{{ n.is_ancestor }};
+                {{ for c in n.children }}
+                EDGE:{{ n.title }}>{{ c.title }};
+                NODE:{{ c.title }}|{{ c.url }}|{{ c.is_active }}|{{ c.is_ancestor }};
+                {{ for g in c.children }}
+                EDGE:{{ c.title }}>{{ g.title }};
+                NODE:{{ g.title }}|{{ g.url }}|{{ g.is_active }}|{{ g.is_ancestor }};
+                {{ end }}{{ end }}{{ end }}
+                ANCESTORS:{{ for a in page.ancestors }}{{ a.title }}|{{ a.url }};{{ end }}
+                {{ if page.section }}SECTION:{{ page.section.title }}|{{ page.section.path }}|{{ page.section.url }};{{ end }}
+                """);
+
+            var result = await CreateBuilder().BuildAsync(dir);
+            await Assert.That(result.Errors).IsEmpty();
+            await Assert.That(result.Success).IsTrue();
+            var html = await File.ReadAllTextAsync(Path.Combine(dir, "_site", "detached", "config", "index.html"));
+            await Assert.That(html).Contains("ROOT:3;");
+            await Assert.That(html).DoesNotContain("WRONG_BINDING");
+            await Assert.That(html).Contains($"NODE:Top|{basePath}/top/|false|true;");
+            await Assert.That(html).Contains($"NODE:Getting Started|{basePath}/guides/getting-started/|false|true;");
+            await Assert.That(html).Contains($"NODE:Config|{basePath}/detached/config/|true|false;");
+            await Assert.That(html).Contains($"NODE:Guides|{basePath}/guides/|false|false;");
+            await Assert.That(html).Contains($"NODE:Detached|{basePath}/detached/|false|true;");
+            await Assert.That(html).Contains("EDGE:Top>Getting Started;");
+            await Assert.That(html).Contains("EDGE:Getting Started>Config;");
+            await Assert.That(html).Contains("EDGE:Guides>Remaining;");
+            await Assert.That(html).DoesNotContain("NODE:Advanced|");
+            await Assert.That(html).Contains($"ANCESTORS:Docs|{basePath}/;Top|{basePath}/top/;Getting Started|{basePath}/guides/getting-started/;");
+            await Assert.That(html).Contains("SECTION:Advanced|guides/advanced|");
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Test]
+    [Arguments("missing.md", false)]
+    [Arguments("top.md", true)]
+    [Arguments("a869d67a-e4e1-48c5-a08c-75241df633d1", true)]
+    public async Task Build_InvalidOrUnpublishedParent_FailsBeforeRendering(string reference, bool draftTarget)
+    {
+        var dir = CreateSiteWithNavLayout();
+        try
+        {
+            if (draftTarget)
+                await File.WriteAllTextAsync(Path.Combine(dir, "content", "top.md"),
+                    "---\ntitle: Top\ndraft: true\nid: a869d67a-e4e1-48c5-a08c-75241df633d1\n---\nDraft");
+            var source = Path.Combine(dir, "content", "guides", "advanced", "config.md");
+            await File.WriteAllTextAsync(source, $"---\ntitle: Config\nparent: {reference}\n---\nChild");
+            var result = await CreateBuilder().BuildAsync(dir);
+            await Assert.That(result.Success).IsFalse();
+            await Assert.That(result.RenderedFiles).IsEqualTo(0);
+            await Assert.That(result.Errors).HasSingleItem();
+            await Assert.That(result.Errors[0]).Contains(source);
+            await Assert.That(result.Errors[0]).Contains(reference);
+            await Assert.That(Directory.Exists(Path.Combine(dir, "_site"))).IsFalse();
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Test]
     public async Task Build_NavTreeMarkers_CorrectOnNestedPage()
     {
         var dir = CreateSiteWithNavLayout();

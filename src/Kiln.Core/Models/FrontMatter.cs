@@ -10,6 +10,9 @@ public sealed class FrontMatter
     /// <summary>Gets an optional identifier of the item.</summary>
     public string? Id { get; init; }
 
+    /// <summary>Gets the optional collection-relative source path or UUID of the navigation parent.</summary>
+    public string? Parent { get; init; }
+
     /// <summary>Gets the title of the item.</summary>
     public required string Title { get; init; }
 

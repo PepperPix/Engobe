@@ -8,6 +8,139 @@ public class TemplateRendererTests
     private readonly TemplateRenderer _renderer = new();
 
     [Test]
+    [Arguments("guides/overview.md", "/")]
+    [Arguments("guides/overview.md", "/site")]
+    [Arguments("a869d67a-e4e1-48c5-a08c-75241df633d1", "/")]
+    [Arguments("a869d67a-e4e1-48c5-a08c-75241df633d1", "/site")]
+    public async Task Render_ParentChain_UsesEffectiveAncestorsAndStructuralSection(string reference, string basePath)
+    {
+        var theme = CreateTempTheme(
+            "{{ for a in page.ancestors }}{{ a.title }}|{{ a.url }};{{ end }}SECTION:{{ page.section.title }}|{{ page.section.path }}|{{ page.section.url }}",
+            "default");
+        try
+        {
+            var collection = CreateTestCollection();
+            var parent = CreateNavigationItem(collection, "Overview", "guides/overview.md", "guides", "/blog/guides/overview/",
+                id: "a869d67a-e4e1-48c5-a08c-75241df633d1");
+            var middle = CreateNavigationItem(collection, "Middle", "middle.md", "", "/elsewhere/", parent: reference);
+            var child = CreateNavigationItem(collection, "Child", "old/deep-section/child.md", "old/deep-section",
+                "/blog/old/deep-section/child/", parent: "middle.md");
+            var site = CreateTestSite(collection, basePath);
+            var shared = SharedRenderContext.Build(site, new Dictionary<string, IReadOnlyList<TaxonomyTerm>>(),
+                NavigationTreeBuilder.Build([parent, middle, child], site.BasePath));
+
+            var html = _renderer.Render(child, shared, site, theme, []);
+            var prefix = site.BasePath;
+            await Assert.That(html).IsEqualTo(
+                $"Posts|{prefix}/blog/;Guides|{prefix}/blog/guides/;Overview|{prefix}/blog/guides/overview/;Middle|{prefix}/elsewhere/;"
+                + $"SECTION:Deep Section|old/deep-section|{prefix}/blog/old/deep-section/");
+        }
+        finally
+        {
+            Directory.Delete(theme, true);
+        }
+    }
+
+    [Test]
+    [Arguments("", "/")]
+    [Arguments("", "/site")]
+    [Arguments("guides/deep-section", "/")]
+    [Arguments("guides/deep-section", "/site")]
+    public async Task Render_Section_IsNullAtRootOrDescribesDeepestDirectory(string section, string basePath)
+    {
+        var theme = CreateTempTheme(
+            "{{ if page.section == null }}NULL{{ else }}{{ page.section.title }}|{{ page.section.path }}|{{ page.section.url }}{{ end }}",
+            "default");
+        try
+        {
+            var collection = CreateTestCollection();
+            var sectionPrefix = section.Length == 0 ? "" : section + "/";
+            var item = CreateNavigationItem(collection, "Child", sectionPrefix + "child.md", section, $"/blog/{sectionPrefix}child/");
+            var site = CreateTestSite(collection, basePath);
+            var shared = SharedRenderContext.Build(site, new Dictionary<string, IReadOnlyList<TaxonomyTerm>>(),
+                NavigationTreeBuilder.Build([item], site.BasePath));
+            var html = _renderer.Render(item, shared, site, theme, []);
+            await Assert.That(html).IsEqualTo(section.Length == 0
+                ? "NULL" : $"Deep Section|guides/deep-section|{site.BasePath}/blog/guides/deep-section/");
+        }
+        finally
+        {
+            Directory.Delete(theme, true);
+        }
+    }
+
+    [Test]
+    [Arguments("/", null)]
+    [Arguments("/site", null)]
+    [Arguments("/", "parent.md")]
+    [Arguments("/site", "parent.md")]
+    public async Task Render_Section_UsesNavigationUrlForOverriddenItem(string basePath, string? parentReference)
+    {
+        var theme = CreateTempTheme(
+            "{{ page.section.title }}|{{ page.section.path }}|{{ page.section.url }}|{{ navtree.posts[0].url }}",
+            "default");
+        try
+        {
+            var collection = CreateTestCollection();
+            var overridden = CreateNavigationItem(collection, "Custom", "guides/custom.md", "guides", "/custom/",
+                parent: parentReference);
+            overridden.Extra["permalink_override"] = "/custom/";
+            var normal = CreateNavigationItem(collection, "Normal", "guides/normal.md", "guides", "/blog/guides/normal/");
+            var parent = CreateNavigationItem(collection, "Parent", "parent.md", "", "/blog/parent/");
+            var site = CreateTestSite(collection, basePath);
+            var shared = SharedRenderContext.Build(site, new Dictionary<string, IReadOnlyList<TaxonomyTerm>>(),
+                NavigationTreeBuilder.Build([overridden, normal, parent], site.BasePath));
+
+            var html = _renderer.Render(overridden, shared, site, theme, []);
+
+            await Assert.That(html).IsEqualTo(
+                $"Guides|guides|{site.BasePath}/blog/guides/|{site.BasePath}/blog/guides/");
+        }
+        finally
+        {
+            Directory.Delete(theme, true);
+        }
+    }
+
+    [Test]
+    [Arguments("/")]
+    [Arguments("/site")]
+    public async Task Render_Section_UsesStructuralFallbackWhenOverrideRemovesSection(string basePath)
+    {
+        var theme = CreateTempTheme("{{ page.section.title }}|{{ page.section.path }}|{{ page.section.url }}", "default");
+        try
+        {
+            var collection = CreateTestCollection();
+            var parent = CreateNavigationItem(collection, "Parent", "parent.md", "", "/blog/parent/");
+            var child = CreateNavigationItem(collection, "Child", "guides/child.md", "guides", "/custom/", parent: "parent.md");
+            child.Extra["permalink_override"] = "/custom/";
+            var site = CreateTestSite(collection, basePath);
+            var navTree = NavigationTreeBuilder.Build([parent, child], site.BasePath);
+            var shared = SharedRenderContext.Build(site, new Dictionary<string, IReadOnlyList<TaxonomyTerm>>(), navTree);
+
+            var html = _renderer.Render(child, shared, site, theme, []);
+
+            await Assert.That(navTree["posts"].Count).IsEqualTo(1);
+            await Assert.That(navTree["posts"][0].Title).IsEqualTo("Parent");
+            await Assert.That(html).IsEqualTo($"Guides|guides|{site.BasePath}/guides/");
+        }
+        finally
+        {
+            Directory.Delete(theme, true);
+        }
+    }
+
+    private static ContentItem CreateNavigationItem(
+        ContentGroup collection, string title, string path, string section, string url, string? parent = null, string? id = null)
+        => new()
+        {
+            Title = title, SourcePath = path, RelativePath = path, SectionPath = section,
+            Slug = title.ToLowerInvariant(), RawContent = "", HtmlContent = "",
+            Url = new Uri(url, UriKind.Relative), OutputPath = url.Trim('/') + "/index.html",
+            Collection = collection, Parent = parent, Id = id
+        };
+
+    [Test]
     public async Task Render_AppliesLayoutWithSiteAndPageData()
     {
         var tempTheme = CreateTempTheme(

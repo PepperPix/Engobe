@@ -8,6 +8,26 @@ public class ContentReaderTests
     private readonly ContentReader _reader = new(new MarkdownProcessor());
 
     [Test]
+    [Arguments(null)]
+    [Arguments("guides/Overview.md")]
+    [Arguments("a869d67a-e4e1-48c5-a08c-75241df633d1")]
+    public async Task ReadCollection_PreservesOptionalParent(string? parent)
+    {
+        var parentLine = parent is null ? "" : $"parent: {parent}\n";
+        var dir = CreateTempContent("child.md", $"---\ntitle: Child\n{parentLine}---\nBody");
+        try
+        {
+            var item = _reader.ReadCollection(MakeCollection("posts", dir), dir).Single();
+            await Assert.That(item.Parent).IsEqualTo(parent);
+            await Assert.That(item.Extra.ContainsKey("parent")).IsFalse();
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Test]
     public async Task ReadCollection_ReturnsEmptyForNonexistentDirectory()
     {
         var collection = MakeCollection("posts", "/nonexistent/path");
@@ -736,4 +756,3 @@ public class ContentReaderTests
     private static ContentGroup MakeCollection(string name, string directory, string sort = "none", string[]? taxonomies = null, int teaserWords = 55) =>
         new() { Name = name, Directory = directory, Sort = sort, Taxonomies = [.. taxonomies ?? ["tags", "categories"]], TeaserWords = teaserWords };
 }
-

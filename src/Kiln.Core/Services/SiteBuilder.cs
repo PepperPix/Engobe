@@ -78,7 +78,16 @@ public sealed class SiteBuilder(
 
         // Build navigation tree once per build
         var publishedItems = allItems.Where(i => !i.Draft || includeDrafts).ToList();
-        var navTree = NavigationTreeBuilder.Build(publishedItems, config.BasePath);
+        IReadOnlyDictionary<string, IReadOnlyList<NavigationNode>> navTree;
+        try
+        {
+            navTree = NavigationTreeBuilder.Build(publishedItems, config.BasePath);
+        }
+        catch (InvalidOperationException ex)
+        {
+            errors.Add(ex.Message);
+            return MakeResult(allItems.Count, 0, 0, stopwatch.Elapsed, outputDir, warnings, errors);
+        }
         var sharedRenderContext = SharedRenderContext.BuildForBuild(config, allTaxonomyTerms, navTree, assetUrls);
 
         // Collect all virtual page URLs for collision checking

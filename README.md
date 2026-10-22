@@ -212,12 +212,38 @@ Shortcodes are not resolved inside fenced code blocks (` ``` ` / `~~~`), so exam
 Template data available to layouts and partials includes:
 
 - `page.ancestors` — the breadcrumb chain for the current page, ordered root → … → parent (the
-  current page itself is not included). Each entry is `{title, url}`.
+  current page itself is not included). Each entry is `{title, url}`. The chain includes the
+  collection root and follows the effective section/page hierarchy, including parent overrides.
+- `page.section` — the deepest structural directory section as `{title, path, url}`, or `null`
+  for a page at the collection root. `path` is collection-relative, the title is humanized, and
+  the URL includes the site base path. A parent override does not change this directory context.
 - `page.no_index` — `true` when the current page has `noIndex: true` in front matter; the engine
   injects the robots meta tag automatically and does not require theme logic to re-render it.
 - `navtree.<collection-name>` — the hierarchical navigation tree for a given collection. Each node
   is `{title, url, weight, is_active, is_ancestor, children}`, where `is_active`/`is_ancestor` are
-  computed relative to the page currently being rendered.
+  computed relative to the page currently being rendered. Effective ancestors are marked even
+  when their URLs are not prefixes of the current URL; URL-prefix detection also remains active.
+
+Navigation follows content directories by default. Set optional front matter `parent` to move
+a page under another published page in the same collection:
+
+```yaml
+parent: guides/overview.md
+```
+
+An exact `.md` suffix selects a case-sensitive, collection-relative source path with `/`
+separators, not a slug or URL. Otherwise, the value must be a UUID matching the target's `id`:
+
+```yaml
+parent: a869d67a-e4e1-48c5-a08c-75241df633d1
+```
+
+UUID references survive target file renames and URL changes. IDs must resolve uniquely within
+the collection. The override replaces the direct directory parent; unused sections disappear,
+while other pages keep their structure. Siblings remain sorted by ascending weight, then title.
+Unknown, unpublished, cross-collection, ambiguous, or cyclic references fail the build before
+rendering, with the source file and invalid value in the error. `kiln serve` reports the same
+error during its full rebuilds.
 
 Front matter can also set `noIndex: true` on individual pages to keep them out of the generated
 `sitemap.xml` and force a `<meta name="robots" content="noindex, nofollow">` tag in the rendered

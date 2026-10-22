@@ -25,7 +25,7 @@ public sealed class ContentReader(IMarkdownProcessor markdownProcessor, IShortco
     private static readonly HashSet<string> KnownFrontMatterKeys = new(StringComparer.OrdinalIgnoreCase)
     {
         "id", "title", "date", "draft", "layout", "slug", "description",
-        "url", "weight", "extra", "imageOptimization", "noIndex"
+        "url", "weight", "extra", "imageOptimization", "noIndex", "parent"
     };
 
     private readonly IShortcodeProcessor _shortcodeProcessor = shortcodeProcessor ?? new ShortcodeProcessor();
@@ -177,6 +177,7 @@ public sealed class ContentReader(IMarkdownProcessor markdownProcessor, IShortco
         return new ContentItem
         {
             Id = frontMatter.Id,
+            Parent = frontMatter.Parent,
             Title = frontMatter.Title,
             Date = frontMatter.Date,
             Draft = frontMatter.Draft,

@@ -8,6 +8,9 @@ public sealed class ContentItem
     /// <summary>Gets the identifier from the front matter, if any.</summary>
     public string? Id { get; init; }
 
+    /// <summary>Gets the optional collection-relative source path or UUID of the navigation parent.</summary>
+    public string? Parent { get; init; }
+
     /// <summary>Gets the title of the item.</summary>
     public required string Title { get; init; }
 
@@ -101,4 +104,3 @@ public sealed class ContentItem
     /// <summary>Gets the items referenced by this item, keyed by the front matter key. The builder resolves them from the collection's <see cref="ContentGroup.References"/>.</summary>
     public Dictionary<string, ContentItem> ResolvedReferences { get; } = [];
 }
-
