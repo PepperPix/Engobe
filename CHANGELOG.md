@@ -1,3 +1,10 @@
+# [2.0.0-beta.5](https://github.com/PepperPix/Kiln/compare/v2.0.0-beta.4...v2.0.0-beta.5) (2026-10-22)
+
+
+### Features
+
+* support nested page bundle assets ([#48](https://github.com/PepperPix/Kiln/issues/48)) ([08a57ac](https://github.com/PepperPix/Kiln/commit/08a57ac6f0abaa0f5bf791bf400ed8f943ddfde7))
+
 # [2.0.0-beta.4](https://github.com/PepperPix/Kiln/compare/v2.0.0-beta.3...v2.0.0-beta.4) (2026-10-22)
 
 
