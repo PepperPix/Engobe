@@ -245,7 +245,8 @@ public class SiteBuilderImageOptimizationTests
             await Assert.That(result.Success).IsTrue();
             var outputPath = Path.Combine(dir, "_site", "assets", "content", "posts", "guides", "advanced", "bundle-post", "images", "referenced.png");
             await Assert.That((await File.ReadAllBytesAsync(outputPath)).SequenceEqual(originalBytes)).IsTrue();
-            await Assert.That(result.Warnings.Any(static warning => warning.Contains("images/referenced.png", StringComparison.Ordinal))).IsTrue();
+            var referencedImagePath = Path.Combine("images", "referenced.png");
+            await Assert.That(result.Warnings.Any(warning => warning.Contains(referencedImagePath, StringComparison.Ordinal))).IsTrue();
         }
         finally
         {
