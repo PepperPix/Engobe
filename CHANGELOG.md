@@ -1,3 +1,10 @@
+# [2.0.0-beta.4](https://github.com/PepperPix/Kiln/compare/v2.0.0-beta.3...v2.0.0-beta.4) (2026-10-22)
+
+
+### Features
+
+* **navigation:** support parent overrides and section context ([#47](https://github.com/PepperPix/Kiln/issues/47)) ([34960d4](https://github.com/PepperPix/Kiln/commit/34960d42e325b664cb2562a24bb23a6beabf2f5c))
+
 # [2.0.0-beta.3](https://github.com/PepperPix/Kiln/compare/v2.0.0-beta.2...v2.0.0-beta.3) (2026-10-22)
 
 
