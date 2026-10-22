@@ -51,6 +51,9 @@ public sealed class SiteBuilder(
         if (!TryLoadConfiguration(projectPath, out var config, out var outputDir, out var themePath, errors))
             return MakeResult(0, 0, 0, stopwatch.Elapsed, outputDir, warnings, errors);
 
+        if (config.Home is null)
+            warnings.Add("site root `/` is empty");
+
         if (baseUrlOverride is not null)
             config = config.WithBaseUrl(baseUrlOverride);
         var assetUrls = new AssetUrlResolver(config, environment);
