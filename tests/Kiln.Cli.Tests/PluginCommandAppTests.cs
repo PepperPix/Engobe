@@ -3,6 +3,8 @@ namespace Kiln.Cli.Tests;
 using Kiln.Cli.Commands;
 using Kiln.Cli.Tests.Fakes;
 using Kiln.Services;
+using Kiln.Tests;
+using System.Security.Cryptography;
 using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console.Cli;
 using Spectre.Console.Cli.Testing;
@@ -10,6 +12,90 @@ using Spectre.Console.Testing;
 
 public class PluginCommandAppTests
 {
+    [Test]
+    [Arguments(false, "match")]
+    [Arguments(true, "match")]
+    [Arguments(false, "missing")]
+    [Arguments(true, "missing")]
+    [Arguments(false, "mismatch")]
+    [Arguments(true, "mismatch")]
+    [Arguments(false, "offline-match")]
+    [Arguments(true, "offline-match")]
+    [Arguments(false, "offline-missing")]
+    [Arguments(true, "offline-missing")]
+    public async Task PluginCommands_EnforcePackageHashVerification_WithRealV3Feed(bool update, string mode)
+    {
+        await using var feed = new FakeNuGetV3Feed();
+        var hash = mode == "mismatch" ? Convert.ToBase64String(new byte[64]) : "match";
+        if (mode.Contains("missing", StringComparison.Ordinal))
+            hash = null;
+        feed.AddPackage("Kiln.Plugin.Verified", "1.2.3", hash);
+        var client = await feed.CreateClientAsync();
+        var root = Path.Combine(Path.GetTempPath(), $"kiln-cli-hash-{Guid.NewGuid():N}");
+        var project = Path.Combine(root, "project");
+        var lockFile = new PluginLockFile();
+        Directory.CreateDirectory(project);
+        try
+        {
+            if (mode.StartsWith("offline", StringComparison.Ordinal))
+            {
+                await client.AddAsync("Kiln.Plugin.Verified", "1.2.3", Path.Combine(root, "warm"));
+                await client.GetLatestVersionAsync("Kiln.Plugin.Verified");
+                feed.ExpireCache();
+                feed.Offline = true;
+                client = await feed.CreateClientAsync();
+            }
+            if (update)
+            {
+                var installed = Path.Combine(project, "plugins", "verified");
+                Directory.CreateDirectory(installed);
+                await File.WriteAllTextAsync(Path.Combine(installed, "plugin.yaml"), "name: verified\nversion: 1.0.0\n");
+                await lockFile.SetAsync(project, "verified", new PluginLockEntry("Kiln.Plugin.Verified", "1.0.0", "nuget")
+                {
+                    ContentHash = PluginContentHasher.ComputeDirectoryHash(installed),
+                });
+            }
+            var before = SnapshotFileHashes(project);
+            var (app, console) = CreateApp(client, lockFile);
+            console.Profile.Width = 1000;
+            var result = await app.RunAsync(update
+                ? ["plugin", "update", "verified", project, "--yes"]
+                : ["plugin", "add", "Kiln.Plugin.Verified", project, "--version", "1.2.3", "--yes"]);
+
+            var failure = mode is "mismatch" or "offline-missing";
+            await Assert.That(result.ExitCode).IsEqualTo(failure ? 1 : 0);
+            if (failure)
+            {
+                await Assert.That(SnapshotFileHashes(project)).IsEquivalentTo(before);
+                await Assert.That(console.Output).Contains(mode == "mismatch" ? "SHA-512 hash mismatch" : "cannot be verified offline");
+            }
+            else
+            {
+                var entries = await lockFile.ReadAsync(project);
+                await Assert.That(entries["verified"].Version).IsEqualTo("1.2.3");
+                await Assert.That(entries["verified"].ContentHash).IsEqualTo(PluginContentHasher.ComputeDirectoryHash(Path.Combine(project, "plugins", "verified")));
+            }
+            if (mode is "missing" or "offline-missing")
+            {
+                await Assert.That(console.Output).Contains("WARN:");
+                await Assert.That(console.Output).Contains(feed.Source);
+                await Assert.That(console.Output).Contains("Kiln.Plugin.Verified 1.2.3");
+            }
+            if (mode == "missing")
+                await Assert.That(console.Output).Contains("without package hash verification");
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private static string[] SnapshotFileHashes(string root) =>
+        Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
+            .Select(path => $"{Path.GetRelativePath(root, path)}:{Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)))}")
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
     [Test]
     public async Task PluginSearchCommand_ShowsResultsFromNuGet()
     {

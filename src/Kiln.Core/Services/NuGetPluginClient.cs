@@ -124,6 +124,19 @@ public sealed class NuGetPluginClient : INuGetPluginClient
 
     private async Task<string?> GetLatestVersionCoreAsync(string normalizedPackageId, CancellationToken ct)
     {
+        var versions = await NuGetPluginPackageReader.GetVersionsAsync(_sourceRepository, normalizedPackageId, ct).ConfigureAwait(false);
+        versions ??= await GetSourceVersionsAsync(normalizedPackageId, ct).ConfigureAwait(false);
+
+        var latestVersion = versions
+            .Where(v => !v.IsPrerelease)
+            .DefaultIfEmpty()
+            .Max();
+
+        return latestVersion?.OriginalVersion;
+    }
+
+    private async Task<IReadOnlyList<NuGetVersion>> GetSourceVersionsAsync(string normalizedPackageId, CancellationToken ct)
+    {
         var packageFinder = await _sourceRepository.GetResourceAsync<FindPackageByIdResource>(ct).ConfigureAwait(false)
             ?? throw new InvalidOperationException("The NuGet repository does not provide package lookup support.");
 
@@ -134,12 +147,7 @@ public sealed class NuGetPluginClient : INuGetPluginClient
             NullLogger.Instance,
             ct).ConfigureAwait(false);
 
-        var latestVersion = versions
-            .Where(v => !v.IsPrerelease)
-            .DefaultIfEmpty()
-            .Max();
-
-        return latestVersion?.OriginalVersion;
+        return versions.ToArray();
     }
 
     private async Task<bool> IsUpdateAvailableCoreAsync(string packageId, string currentVersion, CancellationToken ct)
@@ -217,7 +225,7 @@ public sealed class NuGetPluginClient : INuGetPluginClient
 
     private async Task<PluginPackageInstallResult> AddCoreAsync(string normalizedPackageId, string? version, string projectPath, PluginInstallOptions options, CancellationToken ct)
     {
-        using var package = await PreparePackageAsync(normalizedPackageId, version, ct).ConfigureAwait(false);
+        using var package = await PreparePackageAsync(normalizedPackageId, version, ct, options.ReportPackageVerificationWarning).ConfigureAwait(false);
         var feedMetadata = await TryGetFeedMetadataAsync(normalizedPackageId, ct).ConfigureAwait(false);
         var pluginName = package.PluginName;
         var contentRoot = package.ContentRoot;
@@ -257,10 +265,12 @@ public sealed class NuGetPluginClient : INuGetPluginClient
         {
             ContentHash = PluginContentHasher.ComputeDirectoryHash(destinationDir),
             Trust = PluginTrust.Classify(normalizedPackageId, feedMetadata?.PrefixReserved ?? false),
+            PackageVerificationWarning = package.VerificationWarning,
         };
     }
 
-    private async Task<PreparedPackage> PreparePackageAsync(string normalizedPackageId, string? version, CancellationToken ct)
+    private async Task<PreparedPackage> PreparePackageAsync(
+        string normalizedPackageId, string? version, CancellationToken ct, Action<string>? reportWarning = null)
     {
         var resolvedVersion = string.IsNullOrWhiteSpace(version)
             ? await GetLatestVersionCoreAsync(normalizedPackageId, ct).ConfigureAwait(false)
@@ -272,21 +282,11 @@ public sealed class NuGetPluginClient : INuGetPluginClient
         if (!NuGetVersion.TryParse(resolvedVersion, out var nuGetVersion))
             throw new InvalidOperationException($"Package '{normalizedPackageId}' requested {nameof(version)} '{resolvedVersion}' is not a valid NuGet {nameof(version)}.");
 
-        var packageFinder = await _sourceRepository.GetResourceAsync<FindPackageByIdResource>(ct).ConfigureAwait(false)
-            ?? throw new InvalidOperationException("The NuGet repository does not provide package lookup support.");
         using var packageStream = new MemoryStream();
-        using var cacheContext = new SourceCacheContext();
-        var found = await packageFinder.CopyNupkgToStreamAsync(
-            normalizedPackageId,
-            nuGetVersion,
-            packageStream,
-            cacheContext,
-            NullLogger.Instance,
-            ct).ConfigureAwait(false);
-
-        if (!found || packageStream.Length == 0)
-            throw new InvalidOperationException($"Package '{normalizedPackageId}' {nameof(version)} '{resolvedVersion}' was not found on the configured NuGet source.");
-
+        var verificationWarning = await NuGetPluginPackageReader.DownloadAndVerifyAsync(
+            _sourceRepository, normalizedPackageId, nuGetVersion, packageStream, ct).ConfigureAwait(false);
+        if (verificationWarning is not null)
+            reportWarning?.Invoke(verificationWarning);
         packageStream.Position = 0;
 
         var tempRoot = Path.Combine(Path.GetTempPath(), $"kiln-plugin-{Guid.NewGuid():N}");
@@ -340,7 +340,7 @@ public sealed class NuGetPluginClient : INuGetPluginClient
             var pluginName = ReadPluginName(manifest, normalizedPackageId);
 
             prepared = true;
-            return new PreparedPackage(tempRoot, contentRoot, resolvedVersion, pluginName, manifest, nuspec);
+            return new PreparedPackage(tempRoot, contentRoot, resolvedVersion, pluginName, manifest, nuspec, verificationWarning);
         }
         finally
         {
@@ -512,7 +512,8 @@ public sealed class NuGetPluginClient : INuGetPluginClient
         string version,
         string pluginName,
         Dictionary<string, object?>? manifest,
-        PluginNuspecInfo nuspec) : IDisposable
+        PluginNuspecInfo nuspec,
+        string? verificationWarning) : IDisposable
     {
         public string ContentRoot { get; } = contentRoot;
 
@@ -523,6 +524,8 @@ public sealed class NuGetPluginClient : INuGetPluginClient
         public Dictionary<string, object?>? Manifest { get; } = manifest;
 
         public PluginNuspecInfo Nuspec { get; } = nuspec;
+
+        public string? VerificationWarning { get; } = verificationWarning;
 
         public void Dispose()
         {

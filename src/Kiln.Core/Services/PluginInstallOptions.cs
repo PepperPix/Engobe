@@ -21,4 +21,10 @@ public sealed record PluginInstallOptions
     /// if it is tracked and unmodified (or <see cref="Force"/> is set). When <c>null</c>, an existing directory is replaced.
     /// </summary>
     public IReadOnlyDictionary<string, PluginLockEntry>? ExistingLockEntries { get; init; }
+
+    /// <summary>
+    /// Gets an optional callback that reports missing package hash verification before archive processing.
+    /// The warning is also available on the installation result.
+    /// </summary>
+    public Action<string>? ReportPackageVerificationWarning { get; init; }
 }

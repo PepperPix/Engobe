@@ -50,6 +50,8 @@ public sealed class PluginAddCommand(
             }
             catch (InvalidOperationException ex)
             {
+                if (ex is PluginPackageVerificationException verification)
+                    console.MarkupLine($"[yellow]WARN:[/] {Markup.Escape(verification.Warning)}");
                 console.MarkupLine($"[red]ERROR:[/] {Markup.Escape(ex.Message)}");
                 return 1;
             }
@@ -61,20 +63,31 @@ public sealed class PluginAddCommand(
         }
 
         PluginPackageInstallResult installResult;
+        var verificationWarningReported = false;
         try
         {
             var options = new PluginInstallOptions
             {
                 Force = settings.Force,
                 ExistingLockEntries = await pluginLockFile.ReadAsync(projectPath, cancellationToken).ConfigureAwait(false),
+                ReportPackageVerificationWarning = message =>
+                {
+                    console.MarkupLine($"[yellow]WARN:[/] {Markup.Escape(message)}");
+                    verificationWarningReported = true;
+                },
             };
             installResult = await nuGetPluginClient.AddAsync(settings.PackageId, version, projectPath, options, cancellationToken).ConfigureAwait(false);
         }
         catch (InvalidOperationException ex)
         {
+            if (ex is PluginPackageVerificationException verification)
+                console.MarkupLine($"[yellow]WARN:[/] {Markup.Escape(verification.Warning)}");
             console.MarkupLine($"[red]ERROR:[/] {Markup.Escape(ex.Message)}");
             return 1;
         }
+
+        if (!verificationWarningReported && installResult.PackageVerificationWarning is { } warning)
+            console.MarkupLine($"[yellow]WARN:[/] {Markup.Escape(warning)}");
 
         await pluginLockFile.SetAsync(projectPath, installResult.PluginName, new PluginLockEntry(
             installResult.PackageId,

@@ -20,4 +20,9 @@ public sealed record PluginPackageInstallResult(string PackageId, string Version
     /// Gets the trust level of the installed package.
     /// </summary>
     public PluginTrustLevel Trust { get; init; } = PluginTrustLevel.Community;
+
+    /// <summary>
+    /// Gets an installation warning when the source did not provide a package SHA-512 hash.
+    /// </summary>
+    public string? PackageVerificationWarning { get; init; }
 }

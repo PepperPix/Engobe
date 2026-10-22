@@ -51,11 +51,19 @@ resharper_collection_never_updated_local_highlighting = none
 dotnet_diagnostic.CA1054.severity = none
 dotnet_diagnostic.S1075.severity = none
 
+# NuGet V3 flat-container paths require lowercase package IDs and versions.
+[src/Kiln.Core/Services/NuGetPluginPackageReader.cs]
+dotnet_diagnostic.CA1308.severity = none
+
 # Test fixtures intentionally include sample URLs and numeric literals for behavior verification.
 [tests/**/*.cs]
 dotnet_diagnostic.S109.severity = none
 dotnet_diagnostic.S1075.severity = none
 dotnet_diagnostic.CA2000.severity = none
+
+# Disposal joins the fixture-owned background listener after cancelling it.
+[tests/Fixtures/FakeNuGetV3Feed.cs]
+dotnet_diagnostic.VSTHRD003.severity = none
 
 # Visibility fixtures are intentionally empty, unused and instance-shaped: the tests read only their metadata.
 [tests/Kiln.Core.Tests/Services/ApiSurfaceFixtures.cs]

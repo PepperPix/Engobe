@@ -96,20 +96,31 @@ public sealed class PluginUpdateCommand(
             return false;
 
         PluginPackageInstallResult result;
+        var verificationWarningReported = false;
         try
         {
             var options = new PluginInstallOptions
             {
                 Force = settings.Force,
                 ExistingLockEntries = await pluginLockFile.ReadAsync(projectPath, cancellationToken).ConfigureAwait(false),
+                ReportPackageVerificationWarning = message =>
+                {
+                    console.MarkupLine($"[yellow]WARN:[/] {Markup.Escape(message)}");
+                    verificationWarningReported = true;
+                },
             };
             result = await nuGetPluginClient.AddAsync(entry.PackageId, latestVersion, projectPath, options, cancellationToken).ConfigureAwait(false);
         }
         catch (InvalidOperationException ex)
         {
+            if (ex is PluginPackageVerificationException verification)
+                console.MarkupLine($"[yellow]WARN:[/] {Markup.Escape(verification.Warning)}");
             console.MarkupLine($"[red]ERROR:[/] Could not update '{displayName}': {Markup.Escape(ex.Message)}");
             return false;
         }
+
+        if (!verificationWarningReported && result.PackageVerificationWarning is { } warning)
+            console.MarkupLine($"[yellow]WARN:[/] {Markup.Escape(warning)}");
 
         await pluginLockFile.SetAsync(projectPath, result.PluginName, new PluginLockEntry(
             result.PackageId,
@@ -134,6 +145,8 @@ public sealed class PluginUpdateCommand(
         }
         catch (InvalidOperationException ex)
         {
+            if (ex is PluginPackageVerificationException verification)
+                console.MarkupLine($"[yellow]WARN:[/] {Markup.Escape(verification.Warning)}");
             console.MarkupLine($"[red]ERROR:[/] Could not update '{displayName}': {Markup.Escape(ex.Message)}");
             return false;
         }

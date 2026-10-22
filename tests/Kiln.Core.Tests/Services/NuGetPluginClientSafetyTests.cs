@@ -2,13 +2,60 @@ namespace Kiln.Core.Tests.Services;
 
 using System.IO.Compression;
 using System.Text;
+using System.Security.Cryptography;
 using Kiln.Services;
+using Kiln.Tests;
 using NuGet.Configuration;
 using NuGet.Protocol;
 using NuGet.Protocol.Core.Types;
 
 public class NuGetPluginClientSafetyTests
 {
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task AddAsync_HashMismatch_LeavesPluginAndLockUnchanged(bool update)
+    {
+        await using var feed = new FakeNuGetV3Feed();
+        feed.AddPackage("Kiln.Plugin.Verified", "1.2.3", Convert.ToBase64String(new byte[64]));
+        var client = await feed.CreateClientAsync();
+        var root = Path.Combine(Path.GetTempPath(), $"kiln-hash-safety-{Guid.NewGuid():N}");
+        var pluginDir = Path.Combine(root, "plugins", "verified");
+        var lockFile = new PluginLockFile();
+        Directory.CreateDirectory(root);
+        try
+        {
+            if (update)
+            {
+                Directory.CreateDirectory(pluginDir);
+                await File.WriteAllTextAsync(Path.Combine(pluginDir, "plugin.yaml"), "name: verified\nversion: 1.0.0\n");
+                await lockFile.SetAsync(root, "verified", new PluginLockEntry("Kiln.Plugin.Verified", "1.0.0", "nuget")
+                {
+                    ContentHash = PluginContentHasher.ComputeDirectoryHash(pluginDir),
+                });
+            }
+            var before = SnapshotFileHashes(root);
+            var options = new PluginInstallOptions { Force = true, ExistingLockEntries = await lockFile.ReadAsync(root) };
+
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => client.AddAsync("Kiln.Plugin.Verified", "1.2.3", root, options));
+
+            await Assert.That(error!.Message).Contains("SHA-512 hash mismatch");
+            await Assert.That(SnapshotFileHashes(root)).IsEquivalentTo(before);
+            await Assert.That(Directory.Exists(pluginDir)).IsEqualTo(update);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private static string[] SnapshotFileHashes(string root) =>
+        Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
+            .Select(path => $"{Path.GetRelativePath(root, path)}:{Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)))}")
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
     private const int EntryLimitPlusOne = 2001;
     private const int MebiByte = 1024 * 1024;
 
