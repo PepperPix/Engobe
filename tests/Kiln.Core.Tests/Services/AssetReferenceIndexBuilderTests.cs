@@ -54,6 +54,26 @@ public class AssetReferenceIndexBuilderTests
     }
 
     [Test]
+    public async Task Build_DeepBundleImagePath_NormalizesQueryAndFragmentAndIgnoresDownloadLinks()
+    {
+        var item = MakeItem(
+            "Deep Bundle",
+            "/content/posts/guides/advanced/install/index.md",
+            "posts",
+            """
+            <img src="/assets/content/posts/guides/advanced/install/images/screens/x.jpg?v=2#detail">
+            <a href="/assets/content/posts/guides/advanced/install/downloads/setup.zip?download=1#file">Download</a>
+            """);
+
+        var index = _builder.Build([item]);
+
+        const string expectedImagePath = "/assets/content/posts/guides/advanced/install/images/screens/x.jpg";
+        await Assert.That(index.Keys).IsEquivalentTo([expectedImagePath]);
+        await Assert.That(index[expectedImagePath].Select(static reference => reference.Title)).IsEquivalentTo(["Deep Bundle"]);
+        await Assert.That(index.ContainsKey("/assets/content/posts/guides/advanced/install/downloads/setup.zip")).IsFalse();
+    }
+
+    [Test]
     public async Task Build_SrcWithoutAssetsPrefix_Ignored()
     {
         var item = MakeItem("External", "/content/posts/external.md", "posts",

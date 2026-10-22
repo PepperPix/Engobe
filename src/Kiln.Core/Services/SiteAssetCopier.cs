@@ -87,8 +87,8 @@ internal sealed class SiteAssetCopier(IImageOptimizer imageOptimizer, IAssetRefe
                 warnings.Add($"Asset '{relativePath}' in static/ overrides same file from theme '{themeName}'");
 
             Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
-            CopyOrOptimizeFile(file, destPath, imageCopyContext, warnings);
-            generatedFiles?.Add(Path.GetFullPath(destPath));
+            var outputPath = CopyOrOptimizeFile(file, destPath, imageCopyContext, warnings);
+            generatedFiles?.Add(Path.GetFullPath(outputPath));
         }
     }
 
@@ -99,15 +99,14 @@ internal sealed class SiteAssetCopier(IImageOptimizer imageOptimizer, IAssetRefe
         ImageCopyContext imageCopyContext,
         Collection<string> warnings)
     {
-        foreach (var file in Directory.GetFiles(sourceDir, "*", SearchOption.TopDirectoryOnly))
+        var catalog = new PageBundleAssetCatalog(sourceDir);
+        foreach (var relativePath in catalog.RelativePaths)
         {
-            if (Path.GetExtension(file).Equals(".md", StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            Directory.CreateDirectory(destDir);
-            var outputPath = Path.Combine(destDir, Path.GetFileName(file));
-            CopyOrOptimizeFile(file, outputPath, imageCopyContext, warnings);
-            generatedFiles?.Add(Path.GetFullPath(outputPath));
+            var sourcePath = Path.Combine(catalog.RootDirectory, relativePath);
+            var outputPath = Path.Combine(destDir, relativePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+            var actualOutputPath = CopyOrOptimizeFile(sourcePath, outputPath, imageCopyContext, warnings);
+            generatedFiles?.Add(Path.GetFullPath(actualOutputPath));
         }
     }
 
@@ -126,7 +125,7 @@ internal sealed class SiteAssetCopier(IImageOptimizer imageOptimizer, IAssetRefe
         HashSet<string> ReferencedImages,
         Dictionary<string, string> RenameManifest);
 
-    private void CopyOrOptimizeFile(string sourceFile, string destPath, ImageCopyContext context, Collection<string> warnings)
+    private string CopyOrOptimizeFile(string sourceFile, string destPath, ImageCopyContext context, Collection<string> warnings)
     {
         var ext = Path.GetExtension(sourceFile);
         var webPath = AssetPipeline.ToWebPath(context.OutputDir, destPath);
@@ -138,7 +137,7 @@ internal sealed class SiteAssetCopier(IImageOptimizer imageOptimizer, IAssetRefe
         if (!shouldOptimize)
         {
             File.Copy(sourceFile, destPath, overwrite: true);
-            return;
+            return destPath;
         }
 
         try
@@ -152,6 +151,7 @@ internal sealed class SiteAssetCopier(IImageOptimizer imageOptimizer, IAssetRefe
             File.WriteAllBytes(finalDestPath, bytes);
             if (!string.Equals(finalDestPath, destPath, StringComparison.OrdinalIgnoreCase))
                 context.RenameManifest[webPath] = AssetPipeline.ToWebPath(context.OutputDir, finalDestPath);
+            return finalDestPath;
         }
 #pragma warning disable CA1031 // Intentional: a broken source image should not abort the entire build
         catch (Exception ex)
@@ -159,6 +159,7 @@ internal sealed class SiteAssetCopier(IImageOptimizer imageOptimizer, IAssetRefe
         {
             warnings.Add($"Image optimization failed for '{sourceFile}': {ex.Message} — using unoptimized copy.");
             File.Copy(sourceFile, destPath, overwrite: true);
+            return destPath;
         }
     }
 }

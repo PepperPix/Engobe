@@ -26,6 +26,8 @@ public sealed class Scaffolder : IScaffolder
         ("content/posts/05-taxonomies-and-tags.md.template", "content/posts/05-taxonomies-and-tags.md"),
         ("content/posts/_06_page_bundles_and_images/index.md.template", "content/posts/06-page-bundles-and-images/index.md"),
         ("content/posts/_06_page_bundles_and_images/kiln-architecture.svg", "content/posts/06-page-bundles-and-images/kiln-architecture.svg"),
+        ("content/posts/_06_page_bundles_and_images/images/screens/install.svg", "content/posts/06-page-bundles-and-images/images/screens/install.svg"),
+        ("content/posts/_06_page_bundles_and_images/downloads/sample.csv", "content/posts/06-page-bundles-and-images/downloads/sample.csv"),
         ("content/posts/07-theming-with-kiln.md.template", "content/posts/07-theming-with-kiln.md"),
         ("content/posts/08-deploy-your-site.md.template", "content/posts/08-deploy-your-site.md"),
         ("content/posts/09-plugins-and-slots.md.template", "content/posts/09-plugins-and-slots.md"),

@@ -85,6 +85,53 @@ public class SiteBuilderOutputDirectoryTests
         await Assert.That(File.Exists(Path.Combine(workspace.ProjectDir, "content", "posts", "first.md"))).IsTrue();
     }
 
+    [Test]
+    public async Task BuildAsync_Development_PrunesAddedDeletedAndRenamedNestedBundleAssets()
+    {
+        using var workspace = new TempWorkspace();
+        workspace.WriteSiteYaml("_site");
+        var bundleDirectory = Path.Combine(workspace.ProjectDir, "content", "posts", "guides", "advanced", "install");
+        var imageDirectory = Path.Combine(bundleDirectory, "images", "screens");
+        var downloadDirectory = Path.Combine(bundleDirectory, "downloads");
+        Directory.CreateDirectory(imageDirectory);
+        Directory.CreateDirectory(downloadDirectory);
+        await File.WriteAllTextAsync(Path.Combine(bundleDirectory, "index.md"), "---\ntitle: Install\n---\nInstall");
+        await File.WriteAllTextAsync(Path.Combine(imageDirectory, "removed.png"), "old image");
+        await File.WriteAllTextAsync(Path.Combine(imageDirectory, "keep.txt"), "keep");
+        await File.WriteAllTextAsync(Path.Combine(downloadDirectory, "setup.zip"), "old download");
+
+        var firstBuild = await CreateBuilder().BuildAsync(
+            workspace.ProjectDir,
+            false,
+            BuildEnvironment.Development,
+            CancellationToken.None);
+
+        await Assert.That(firstBuild.Success).IsTrue();
+        var bundleOutput = Path.Combine(workspace.ProjectDir, "_site", "assets", "content", "posts", "guides", "advanced", "install");
+        var removedImageOutput = Path.Combine(bundleOutput, "images", "screens", "removed.png");
+        var keepOutput = Path.Combine(bundleOutput, "images", "screens", "keep.txt");
+        var oldDownloadOutput = Path.Combine(bundleOutput, "downloads", "setup.zip");
+        await Assert.That(File.Exists(removedImageOutput)).IsTrue();
+        await Assert.That(File.Exists(oldDownloadOutput)).IsTrue();
+
+        File.Delete(Path.Combine(imageDirectory, "removed.png"));
+        await File.WriteAllTextAsync(Path.Combine(imageDirectory, "added.png"), "new image");
+        File.Move(Path.Combine(downloadDirectory, "setup.zip"), Path.Combine(downloadDirectory, "renamed.zip"));
+
+        var secondBuild = await CreateBuilder().BuildAsync(
+            workspace.ProjectDir,
+            false,
+            BuildEnvironment.Development,
+            CancellationToken.None);
+
+        await Assert.That(secondBuild.Success).IsTrue();
+        await Assert.That(File.Exists(removedImageOutput)).IsFalse();
+        await Assert.That(File.Exists(oldDownloadOutput)).IsFalse();
+        await Assert.That(File.Exists(Path.Combine(bundleOutput, "images", "screens", "added.png"))).IsTrue();
+        await Assert.That(File.Exists(Path.Combine(bundleOutput, "downloads", "renamed.zip"))).IsTrue();
+        await Assert.That(await File.ReadAllTextAsync(keepOutput)).IsEqualTo("keep");
+    }
+
     private static SiteBuilder CreateBuilder()
     {
         return new SiteBuilder(

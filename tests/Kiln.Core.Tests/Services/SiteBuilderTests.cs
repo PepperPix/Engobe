@@ -57,7 +57,24 @@ public class SiteBuilderTests
             var result = await builder.BuildAsync(tempDir);
 
             await Assert.That(result.Success).IsTrue();
-            await Assert.That(File.Exists(Path.Combine(tempDir, "_site", "assets", "content", "posts", "with-image", "hero.txt"))).IsTrue();
+            var outputDir = Path.Combine(tempDir, "_site", "assets", "content", "posts", "with-image");
+            await Assert.That(File.Exists(Path.Combine(outputDir, "hero.txt"))).IsTrue();
+            await Assert.That(File.Exists(Path.Combine(outputDir, "images", "screens", "x.jpg"))).IsTrue();
+            await Assert.That(File.Exists(Path.Combine(outputDir, "images", "screens", "logo.txt"))).IsTrue();
+            await Assert.That(File.Exists(Path.Combine(outputDir, "downloads", "setup.zip"))).IsTrue();
+            await Assert.That(await File.ReadAllTextAsync(Path.Combine(outputDir, "images", "screens", "logo.txt"))).IsEqualTo("image logo");
+            await Assert.That(await File.ReadAllTextAsync(Path.Combine(outputDir, "downloads", "logo.txt"))).IsEqualTo("download logo");
+            await Assert.That(File.Exists(Path.Combine(outputDir, "child", "photo.png"))).IsTrue();
+            await Assert.That(File.Exists(Path.Combine(outputDir, "notes", "data.zip"))).IsTrue();
+            await Assert.That(File.Exists(Path.Combine(outputDir, "images", "manual", "diagram.svg"))).IsTrue();
+            await Assert.That(File.Exists(Path.Combine(outputDir, "child", "index.md"))).IsFalse();
+            await Assert.That(File.Exists(Path.Combine(outputDir, "notes", "article.md"))).IsFalse();
+            await Assert.That(File.Exists(Path.Combine(outputDir, "images", "manual", "README.MD"))).IsFalse();
+            await Assert.That(File.Exists(Path.Combine(outputDir, ".secret"))).IsFalse();
+            await Assert.That(File.Exists(Path.Combine(outputDir, ".private", "picture.jpg"))).IsFalse();
+            await Assert.That(File.Exists(Path.Combine(outputDir, "images", ".cache", "x.jpg"))).IsFalse();
+            await Assert.That(File.Exists(Path.Combine(outputDir, "linked-file.txt"))).IsFalse();
+            await Assert.That(Directory.Exists(Path.Combine(outputDir, "linked-directory"))).IsFalse();
         }
         finally
         {
@@ -260,11 +277,30 @@ public class SiteBuilderTests
             """
             ---
             title: Post With Image
+            imageOptimization: false
             ---
             Content
             """);
 
         File.WriteAllText(Path.Combine(bundleDir, "hero.txt"), "asset content");
+        File.WriteAllText(Path.Combine(dir, "link-target.txt"), "external target");
+        Directory.CreateDirectory(Path.Combine(dir, "link-target-directory"));
+        File.WriteAllText(Path.Combine(dir, "link-target-directory", "nested.txt"), "external target");
+        Directory.CreateSymbolicLink(Path.Combine(bundleDir, "linked-directory"), Path.Combine(dir, "link-target-directory"));
+        File.CreateSymbolicLink(Path.Combine(bundleDir, "linked-file.txt"), Path.Combine(dir, "link-target.txt"));
+        WriteBundleAsset(bundleDir, "images/screens/x.jpg", "image bytes");
+        WriteBundleAsset(bundleDir, "images/screens/logo.txt", "image logo");
+        WriteBundleAsset(bundleDir, "downloads/setup.zip", "archive");
+        WriteBundleAsset(bundleDir, "downloads/logo.txt", "download logo");
+        WriteBundleAsset(bundleDir, "child/index.md", "not a nested item");
+        WriteBundleAsset(bundleDir, "child/photo.png", "adjacent image");
+        WriteBundleAsset(bundleDir, "notes/article.md", "not a nested item");
+        WriteBundleAsset(bundleDir, "notes/data.zip", "adjacent download");
+        WriteBundleAsset(bundleDir, "images/manual/README.MD", "not a nested item");
+        WriteBundleAsset(bundleDir, "images/manual/diagram.svg", "adjacent image");
+        WriteBundleAsset(bundleDir, ".secret", "hidden");
+        WriteBundleAsset(bundleDir, ".private/picture.jpg", "hidden");
+        WriteBundleAsset(bundleDir, "images/.cache/x.jpg", "hidden");
 
         File.WriteAllText(Path.Combine(dir, "themes", "default", "layouts", "default.html"),
             "<html>{{ page.content }}</html>");
@@ -272,6 +308,13 @@ public class SiteBuilderTests
             "<html>Not Found</html>");
 
         return dir;
+    }
+
+    private static void WriteBundleAsset(string bundleDir, string relativePath, string content)
+    {
+        var path = Path.Combine(bundleDir, relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, content);
     }
 
     private static string CreateSiteWithTwoPosts()

@@ -157,6 +157,9 @@ public sealed class ContentReader(IMarkdownProcessor markdownProcessor, IShortco
         var assetBasePath = assetDirectory is not null
             ? $"/assets/content/{collection.Name}/{effectiveSlugForAssets}/"
             : null;
+        var assetCatalog = assetDirectory is not null
+            ? new PageBundleAssetCatalog(assetDirectory)
+            : null;
 
         var shortcodeWarnings = warnings ?? new Collection<string>();
         var processedBody = _shortcodeProcessor.Process(body, plugins ?? [], shortcodeWarnings);
@@ -174,6 +177,11 @@ public sealed class ContentReader(IMarkdownProcessor markdownProcessor, IShortco
                 : TruncateToWords(markdownProcessor.ToPlainText(processedBody), collection.TeaserWords);
         }
 
+        var renderedHtml = assetCatalog is not null
+            ? MarkdownProcessor.ToBundleHtml(markdownProcessor, htmlBody, (destination, isImage) =>
+                ResolveBundleReference(destination, isImage, assetCatalog, assetBasePath!, filePath, shortcodeWarnings))
+            : markdownProcessor.ToHtml(htmlBody, assetBasePath);
+
         return new ContentItem
         {
             Id = frontMatter.Id,
@@ -190,7 +198,7 @@ public sealed class ContentReader(IMarkdownProcessor markdownProcessor, IShortco
             SourcePath = filePath,
             RelativePath = relativePath,
             RawContent = processedBody,
-            HtmlContent = markdownProcessor.ToHtml(htmlBody, assetBasePath),
+            HtmlContent = renderedHtml,
             Url = collection.Url,
             OutputPath = "",
             Collection = collection,
@@ -200,6 +208,75 @@ public sealed class ContentReader(IMarkdownProcessor markdownProcessor, IShortco
             ImageOptimization = frontMatter.ImageOptimization ?? true,
             NoIndex = frontMatter.NoIndex
         };
+    }
+
+    private static string? ResolveBundleReference(
+        string destination,
+        bool isImage,
+        PageBundleAssetCatalog catalog,
+        string assetBasePath,
+        string sourceFile,
+        Collection<string> warnings)
+    {
+        if (destination.StartsWith("/", StringComparison.Ordinal)
+            || destination.StartsWith("#", StringComparison.Ordinal)
+            || Uri.TryCreate(destination, UriKind.Absolute, out _))
+        {
+            return null;
+        }
+
+        var suffixStart = destination.IndexOfAny(['?', '#']);
+        var referencePath = suffixStart < 0 ? destination : destination[..suffixStart];
+        var suffix = suffixStart < 0 ? "" : destination[suffixStart..];
+        if (referencePath.Length == 0)
+            return null;
+
+        var rawSegments = new List<string>();
+        var fileSegments = new List<string>();
+        foreach (var segment in referencePath.Replace('\\', '/').Split('/'))
+        {
+            if (segment.Length == 0)
+                continue;
+
+            var decodedSegment = Uri.UnescapeDataString(segment);
+            if (decodedSegment is ".")
+                continue;
+
+            if (decodedSegment is "..")
+            {
+                if (fileSegments.Count == 0)
+                    return null;
+
+                rawSegments.RemoveAt(rawSegments.Count - 1);
+                fileSegments.RemoveAt(fileSegments.Count - 1);
+                continue;
+            }
+
+            if (decodedSegment.Contains('/', StringComparison.Ordinal) || decodedSegment.Contains('\\', StringComparison.Ordinal))
+                return null;
+
+            rawSegments.Add(segment);
+            fileSegments.Add(decodedSegment);
+        }
+
+        if (rawSegments.Count == 0)
+            return null;
+
+        var relativePath = Path.Combine(fileSegments.ToArray());
+        if (catalog.IsHiddenOrSymbolicLink(relativePath))
+            return null;
+
+        if (catalog.IsExcludedMarkdownTarget(relativePath))
+        {
+            warnings.Add($"Page bundle reference in '{sourceFile}' targets excluded Markdown file '{destination}'.");
+            return null;
+        }
+
+        if (!isImage && !catalog.ContainsAsset(relativePath))
+            return null;
+
+        var normalizedUrlPath = string.Join('/', rawSegments);
+        return assetBasePath.TrimEnd('/') + "/" + normalizedUrlPath + suffix;
     }
 
     private const string MoreMarker = "<!--more-->";

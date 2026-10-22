@@ -839,7 +839,7 @@ public class AssetPipelineIntegrationTests
         }
     }
 
-    private static string CreateSite(
+    internal static string CreateSite(
         bool includeDeadLink = false,
         bool fingerprint = true,
         bool linkCheck = true,
@@ -1035,7 +1035,7 @@ public class AssetPipelineIntegrationTests
         return Path.GetFileNameWithoutExtension(path).EndsWith("." + hash, StringComparison.Ordinal);
     }
 
-    private static ISiteBuilder CreateBuilder(IEnumerable<IAssetMinifier> minifiers, IImageOptimizer? imageOptimizer = null)
+    internal static ISiteBuilder CreateBuilder(IEnumerable<IAssetMinifier> minifiers, IImageOptimizer? imageOptimizer = null)
     {
         var markdownProcessor = new MarkdownProcessor();
         var contentReader = new ContentReader(markdownProcessor);
@@ -1067,7 +1067,7 @@ public class AssetPipelineIntegrationTests
         }
     }
 
-    private static string GetSingleFingerprintedCssFileName(string cssOutputDir)
+    internal static string GetSingleFingerprintedCssFileName(string cssOutputDir)
     {
         var fileNames = Directory.EnumerateFiles(cssOutputDir, "*.css")
             .Select(Path.GetFileName)

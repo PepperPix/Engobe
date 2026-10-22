@@ -47,6 +47,30 @@ public class AssetReferenceIndexBuilderE2ETests
         }
     }
 
+    [Test]
+    public async Task Build_RealNestedBundleImage_NormalizesSuffixAndIncludesEveryReferencingItem()
+    {
+        var dir = CreateBundleProject();
+
+        try
+        {
+            var contentReader = new ContentReader(new MarkdownProcessor());
+            var collection = new ContentGroup { Name = "posts", Directory = "content/posts" };
+            var items = contentReader.ReadCollection(collection, dir);
+            var index = new AssetReferenceIndexBuilder().Build(items);
+            const string imagePath = "/assets/content/posts/guides/advanced/install/images/screens/x.jpg";
+
+            await Assert.That(index.ContainsKey(imagePath)).IsTrue();
+            await Assert.That(index[imagePath].Select(static reference => reference.Title).OrderBy(static title => title, StringComparer.Ordinal))
+                .IsEquivalentTo(["Bundle", "Reference"]);
+            await Assert.That(index.ContainsKey("/assets/content/posts/guides/advanced/install/downloads/setup.zip")).IsFalse();
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
     private static string CreateProject()
     {
         var dir = Path.Combine(Path.GetTempPath(), $"kiln-asset-index-e2e-{Guid.NewGuid():N}");
@@ -81,6 +105,34 @@ public class AssetReferenceIndexBuilderE2ETests
             This post references a different image entirely:
 
             ![Unrelated Image](/assets/img/unrelated.png)
+            """);
+
+        return dir;
+    }
+
+    private static string CreateBundleProject()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"kiln-asset-index-bundle-e2e-{Guid.NewGuid():N}");
+        var bundleDir = Path.Combine(dir, "content", "posts", "guides", "advanced", "install");
+        Directory.CreateDirectory(bundleDir);
+        Directory.CreateDirectory(Path.Combine(dir, "content", "posts"));
+
+        File.WriteAllText(Path.Combine(bundleDir, "index.md"),
+            """
+            ---
+            title: Bundle
+            ---
+            ![Nested](./images/screens/x.jpg?v=2#detail)
+
+            [Download](./downloads/setup.zip?download=1#file)
+            """);
+
+        File.WriteAllText(Path.Combine(dir, "content", "posts", "reference.md"),
+            """
+            ---
+            title: Reference
+            ---
+            ![Nested](/assets/content/posts/guides/advanced/install/images/screens/x.jpg?cache=1#overview)
             """);
 
         return dir;

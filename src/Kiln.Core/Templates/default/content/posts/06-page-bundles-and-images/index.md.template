@@ -45,6 +45,32 @@ content/
 
 Each post is a directory with its own content and assets.
 
+Kiln treats a bundle as a leaf: it reads only the bundle's `index.md`. Nested
+Markdown files such as `child/index.md` or `images/README.md` do not create
+additional pages or sections. They are omitted from published assets, while
+other files in those same directories remain assets.
+
+Bundle assets are copied recursively with their relative subdirectories
+preserved. Kiln omits only Markdown files (case-insensitive `.md` extension),
+hidden files or directories (names starting with `.`), and symbolic links.
+For example, `images/README.md` is omitted, but adjacent images in `images/`
+are still copied.
+
+### Nested bundle assets and sections
+
+Directories inside a page bundle are asset folders, not sections. A nested
+`child/index.md` does not create another page; its non-Markdown siblings remain
+assets. By contrast, a directory outside a bundle that has no `index.md` and
+contains Markdown content is discovered as a normal section.
+
+Nested images and downloads keep their paths in the published asset namespace:
+
+![Installation screen](images/screens/install.svg)
+
+[Download sample data](downloads/sample.csv)
+
+The example files are included beside this post.
+
 ## Benefits
 
 - **Co-location**: Content and assets live together
