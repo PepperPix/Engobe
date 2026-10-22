@@ -6,6 +6,10 @@ namespace Kiln.Models;
 /// </summary>
 public sealed class NavigationNode
 {
+    internal ContentItem? Item { get; init; }
+
+    internal string? SectionPath { get; init; }
+
     /// <summary>Gets the display title of the node.</summary>
     public required string Title { get; init; }
 

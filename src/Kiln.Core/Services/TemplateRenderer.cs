@@ -246,7 +246,17 @@ public sealed class TemplateRenderer : ITemplateRenderer
         });
 
         // Breadcrumb ancestors
-        pageObj.Add("ancestors", BuildAncestors(item));
+        pageObj.Add("ancestors", BuildAncestors(item, shared, site.BasePath));
+        var sectionUrl = shared.NavTree.TryGetValue(item.Collection.Name, out var roots)
+            ? FindSectionUrl(roots, item.SectionPath)
+            : null;
+        pageObj.Add("section", string.IsNullOrEmpty(item.SectionPath) ? null : new
+        {
+            title = NavigationTreeBuilder.Humanize(item.SectionPath.Split('/')[^1]),
+            path = item.SectionPath,
+            url = sectionUrl?.OriginalString
+                ?? NavigationTreeBuilder.BuildSectionUrl(item, item.SectionPath.Split('/'), site.BasePath).OriginalString
+        });
 
         foreach (var (refKey, refItem) in item.ResolvedReferences)
         {
@@ -269,33 +279,63 @@ public sealed class TemplateRenderer : ITemplateRenderer
         return so;
     }
 
-    private static List<object> BuildAncestors(ContentItem item)
+    private static Uri? FindSectionUrl(IReadOnlyList<NavigationNode> nodes, string sectionPath)
     {
-        var sep = Path.AltDirectorySeparatorChar;
-        var urlSegs = item.Url.OriginalString.Split(sep, StringSplitOptions.RemoveEmptyEntries);
-        var sectionSegs = string.IsNullOrEmpty(item.SectionPath)
-            ? []
-            : item.SectionPath.Split(sep, StringSplitOptions.RemoveEmptyEntries);
-        var prefixCount = urlSegs.Length - sectionSegs.Length - 1;
-        var prefixSegs = prefixCount > 0 ? urlSegs[..prefixCount] : [];
-
-        var ancestors = new List<object>();
-
-        // Collection root
-        var collectionUrl = prefixSegs.Length > 0
-            ? $"{sep}{string.Join(sep, prefixSegs)}{sep}"
-            : $"{sep}";
-        ancestors.Add(new { title = NavigationTreeBuilder.Humanize(item.Collection.Name), url = collectionUrl });
-
-        // Section ancestors
-        var cumulative = new List<string>(prefixSegs);
-        foreach (var seg in sectionSegs)
+        foreach (var node in nodes)
         {
-            cumulative.Add(seg);
-            ancestors.Add(new { title = NavigationTreeBuilder.Humanize(seg), url = $"{sep}{string.Join(sep, cumulative)}{sep}" });
+            if (node.SectionPath == sectionPath)
+                return node.Url;
+            if (node.Item is null && FindSectionUrl(node.Children, sectionPath) is { } url)
+                return url;
         }
+        return null;
+    }
 
+    private static List<object> BuildAncestors(ContentItem item, SharedRenderContext shared, string basePath)
+    {
+        var ancestors = new List<object>
+        {
+            new
+            {
+                title = NavigationTreeBuilder.Humanize(item.Collection.Name),
+                url = SiteConfiguration.ApplyBasePath(basePath, item.Collection.IndexUrl)
+            }
+        };
+        var chain = new List<NavigationNode>();
+        if (shared.NavTree.TryGetValue(item.Collection.Name, out var roots)
+            && FindAncestorChain(roots, item, chain))
+        {
+            ancestors.AddRange(chain.Select(node => (object)new { title = node.Title, url = node.Url.OriginalString }));
+        }
+        else
+        {
+            // Standalone rendering can omit the pre-built navigation tree.
+            var segments = item.SectionPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            for (var i = 0; i < segments.Length; i++)
+            {
+                ancestors.Add(new
+                {
+                    title = NavigationTreeBuilder.Humanize(segments[i]),
+                    url = NavigationTreeBuilder.BuildSectionUrl(item, segments[..(i + 1)], basePath).OriginalString
+                });
+            }
+        }
         return ancestors;
+    }
+
+    private static bool FindAncestorChain(
+        IReadOnlyList<NavigationNode> nodes, ContentItem item, List<NavigationNode> chain)
+    {
+        foreach (var node in nodes)
+        {
+            if (ReferenceEquals(node.Item, item))
+                return true;
+            chain.Add(node);
+            if (FindAncestorChain(node.Children, item, chain))
+                return true;
+            chain.RemoveAt(chain.Count - 1);
+        }
+        return false;
     }
 
     private static ScriptObject BuildCommonScriptObject(
@@ -324,7 +364,7 @@ public sealed class TemplateRenderer : ITemplateRenderer
         // navtree — per-collection navigation tree with is_active/is_ancestor per currentUrl
         var navObj = new ScriptObject();
         foreach (var (name, roots) in shared.NavTree)
-            navObj.Add(name, roots.Select(n => ProjectNavNode(n, currentUrl, site.BasePath)).ToList());
+            navObj.Add(name, roots.Select(n => ProjectNavNode(n, currentUrl, site.BasePath).Value).ToList());
         so.Add("navtree", navObj);
 
         // include partial
@@ -405,23 +445,25 @@ public sealed class TemplateRenderer : ITemplateRenderer
         return so;
     }
 
-    private static object ProjectNavNode(NavigationNode node, string? currentUrl, string basePath)
+    private static (object Value, bool ContainsCurrent) ProjectNavNode(NavigationNode node, string? currentUrl, string basePath)
     {
+        var children = node.Children.Select(child => ProjectNavNode(child, currentUrl, basePath)).ToList();
         var nodeUrl = SiteConfiguration.ApplyBasePath(basePath, new Uri(node.Url.OriginalString, UriKind.Relative));
         var isActive = currentUrl is not null &&
             string.Equals(nodeUrl, currentUrl, StringComparison.OrdinalIgnoreCase);
+        var containsCurrent = children.Exists(child => child.ContainsCurrent);
         var isAncestor = !isActive && currentUrl is not null &&
-            currentUrl.StartsWith(nodeUrl, StringComparison.OrdinalIgnoreCase);
+            (currentUrl.StartsWith(nodeUrl, StringComparison.OrdinalIgnoreCase) || containsCurrent);
 
-        return new
+        return (new
         {
             title = node.Title,
             url = nodeUrl,
             weight = node.Weight,
             is_active = isActive,
             is_ancestor = isAncestor,
-            children = node.Children.Select(c => ProjectNavNode(c, currentUrl, basePath)).ToList()
-        };
+            children = children.Select(child => child.Value).ToList()
+        }, isActive || containsCurrent);
     }
 
     private static bool IsPluginEnabledForCollection(Dictionary<string, object>? collectionPlugins, string pluginKey)

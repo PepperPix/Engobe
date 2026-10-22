@@ -5,6 +5,100 @@ using Kiln.Services;
 
 public class NavigationTreeBuilderTests
 {
+    private const string ParentId = "a869d67a-e4e1-48c5-a08c-75241df633d1";
+
+    [Test]
+    [Arguments("guides/Overview.md")]
+    [Arguments(ParentId)]
+    [Arguments("A869D67A-E4E1-48C5-A08C-75241DF633D1")]
+    public async Task Build_ParentReference_ReplacesStructureAndSortsChildren(string reference)
+    {
+        var parent = MakeItem("Overview", "/unrelated/", 0, sectionPath: "guides",
+            navigation: ("guides/Overview.md", ParentId, null));
+        var items = new[]
+        {
+            MakeItem("Z", "/old/z/", 1, sectionPath: "old", navigation: ("old/z.md", null, reference)),
+            MakeItem("B", "/unused/deep/b/", 0, sectionPath: "unused/deep", navigation: ("unused/deep/b.md", null, reference)),
+            MakeItem("A", "/old/a/", 0, sectionPath: "old", navigation: ("old/a.md", null, reference)),
+            MakeItem("Remaining", "/old/remaining/", 0, sectionPath: "old"),
+            parent
+        };
+        var roots = NavigationTreeBuilder.Build(items)["posts"];
+        await Assert.That(roots.Select(node => node.Title)).IsEquivalentTo(["Guides", "Old"]);
+        var overview = roots.Single(node => node.Title == "Guides").Children.Single();
+        await Assert.That(overview.Children.Select(node => node.Title)).IsEquivalentTo(["A", "B", "Z"]);
+        await Assert.That(string.Join(",", overview.Children.Select(node => node.Title))).IsEqualTo("A,B,Z");
+        await Assert.That(roots.Single(node => node.Title == "Old").Children.Single().Title).IsEqualTo("Remaining");
+    }
+
+    [Test]
+    [Arguments("missing.md")]
+    [Arguments("overview.md")]
+    [Arguments("Overview.MD")]
+    [Arguments("/Overview.md")]
+    [Arguments("Overview")]
+    [Arguments("")]
+    [Arguments("not-a-uuid")]
+    [Arguments("00000000-0000-0000-0000-000000000001")]
+    public async Task Build_InvalidParent_ReportsSourceAndValue(string reference)
+    {
+        var items = new[]
+        {
+            MakeItem("Overview", "/Overview/", 0, navigation: ("Overview.md", ParentId, null)),
+            MakeItem("Child", "/child/", 0, navigation: ("child.md", null, reference))
+        };
+        await Assert.That(() => NavigationTreeBuilder.Build(items))
+            .ThrowsExactly<InvalidOperationException>()
+            .WithMessageContaining("/child.md")
+            .And.WithMessageContaining($"'{reference}'");
+    }
+
+    [Test]
+    [Arguments("Overview.md")]
+    [Arguments(ParentId)]
+    public async Task Build_CrossCollectionOrUnpublishedParent_IsNotResolved(string reference)
+    {
+        var child = MakeItem("Child", "/child/", 0, navigation: ("child.md", null, reference));
+        var other = MakeItem("Overview", "/overview/", 0, collection: MakeCollection("other"),
+            navigation: ("Overview.md", ParentId, null));
+        foreach (var items in new[] { new[] { child }, new[] { child, other } })
+        {
+            await Assert.That(() => NavigationTreeBuilder.Build(items))
+                .ThrowsExactly<InvalidOperationException>()
+                .WithMessageContaining("/child.md")
+                .And.WithMessageContaining(reference);
+        }
+    }
+
+    [Test]
+    public async Task Build_DuplicateParentId_IsAmbiguous()
+    {
+        var items = new[]
+        {
+            MakeItem("One", "/one/", 0, navigation: ("one.md", ParentId, null)),
+            MakeItem("Two", "/two/", 0, navigation: ("two.md", ParentId.ToUpperInvariant(), null)),
+            MakeItem("Child", "/child/", 0, navigation: ("child.md", null, ParentId))
+        };
+        await Assert.That(() => NavigationTreeBuilder.Build(items))
+            .ThrowsExactly<InvalidOperationException>()
+            .WithMessageContaining("/child.md")
+            .And.WithMessageContaining(ParentId);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Build_ParentCycle_ReportsSourceAndValue(bool self)
+    {
+        var first = MakeItem("One", "/one/", 0, navigation: ("one.md", null, self ? "one.md" : ParentId));
+        var second = MakeItem("Two", "/two/", 0, navigation: ("two.md", ParentId, "one.md"));
+        await Assert.That(() => NavigationTreeBuilder.Build([first, second]))
+            .ThrowsExactly<InvalidOperationException>()
+            .WithMessageContaining("/one.md")
+            .And.WithMessageContaining(first.Parent!)
+            .And.WithMessageContaining("cycle");
+    }
+
     [Test]
     public async Task Build_FlatItems_FlatTree()
     {
@@ -208,7 +302,8 @@ public class NavigationTreeBuilderTests
         int weight,
         string sectionPath = "",
         ContentGroup? collection = null,
-        string? permalinkOverride = null)
+        string? permalinkOverride = null,
+        (string Path, string? Id, string? Parent)? navigation = null)
     {
         var col = collection ?? MakeCollection();
         var extra = new Dictionary<string, object>();
@@ -220,11 +315,13 @@ public class NavigationTreeBuilderTests
         return new ContentItem
         {
             Title = title,
+            Id = navigation?.Id,
+            Parent = navigation?.Parent,
             Slug = url.Trim('/').Split('/').Last(),
             SectionPath = sectionPath,
             Weight = weight,
-            SourcePath = "/test.md",
-            RelativePath = "test.md",
+            SourcePath = "/" + (navigation?.Path ?? "test.md"),
+            RelativePath = navigation?.Path ?? "test.md",
             RawContent = "",
             HtmlContent = "",
             Url = new Uri(url, UriKind.Relative),

@@ -4,6 +4,53 @@ using Kiln.Services;
 
 public class ApiThemeLayoutTests
 {
+    [Test]
+    [Arguments("overview.md", "")]
+    [Arguments("a869d67a-e4e1-48c5-a08c-75241df633d1", "/site")]
+    public async Task Build_ApiParentOverride_RetainsRootNavtreeAndBreadcrumbSizeGuard(string reference, string basePath)
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"kiln-api-parent-{Guid.NewGuid():N}");
+        try
+        {
+            var project = new Scaffolder().CreateSite("demo", root).ProjectPath;
+            await File.WriteAllTextAsync(Path.Combine(project, "themes", "default", "layouts", "404.html"), "<html>Not Found</html>");
+            await File.WriteAllTextAsync(Path.Combine(project, "site.yaml"),
+                $"""
+                title: API Site
+                baseUrl: https://example.com{basePath}
+                collections:
+                  reference:
+                    directory: content/reference
+                    permalink: /reference/:slug/
+                    layout: api
+                """);
+            var content = Path.Combine(project, "content", "reference");
+            Directory.CreateDirectory(content);
+            await File.WriteAllTextAsync(Path.Combine(content, "overview.md"),
+                "---\ntitle: Overview\nid: a869d67a-e4e1-48c5-a08c-75241df633d1\nurl: /overview/\n---\nOverview");
+            await File.WriteAllTextAsync(Path.Combine(content, "child.md"),
+                $"---\ntitle: Child\nparent: {reference}\nextra:\n  namespace: Docs.Sample\n---\nChild");
+            var result = await CreateBuilder().BuildAsync(project);
+            await Assert.That(result.Errors).IsEmpty();
+            await Assert.That(result.Success).IsTrue();
+            var child = await File.ReadAllTextAsync(Path.Combine(project, "_site", "reference", "child", "index.html"));
+            var overview = await File.ReadAllTextAsync(Path.Combine(project, "_site", "overview", "index.html"));
+            await Assert.That(child).Contains($"href=\"{basePath}/reference/child/\" aria-current=\"page\"");
+            await Assert.That(child).Contains("<details open><summary>Docs.Sample</summary>");
+            await Assert.That(child).Contains("class=\"api-breadcrumbs\"");
+            await Assert.That(child).Contains($"<a href=\"{basePath}/reference/\">reference</a>");
+            await Assert.That(overview).DoesNotContain("class=\"api-breadcrumbs\"");
+            var layout = await File.ReadAllTextAsync(Path.Combine(project, "themes", "default", "layouts", "api.html"));
+            await Assert.That(layout).Contains("page.ancestors.size > 1");
+            await Assert.That(layout).Contains("navtree[page.collection.name]");
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, true);
+        }
+    }
+
     private static ISiteBuilder CreateBuilder()
     {
         var markdownProcessor = new MarkdownProcessor();

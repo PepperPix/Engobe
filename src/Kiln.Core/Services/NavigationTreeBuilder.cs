@@ -23,6 +23,15 @@ public static class NavigationTreeBuilder
 
         foreach (var group in byCollection)
         {
+            var items = group.ToList();
+            var parents = ResolveParents(items);
+            var leaves = items.ToDictionary(item => item, item => new NavigationNode
+            {
+                Title = item.Title,
+                Url = new Uri(SiteConfiguration.ApplyBasePath(basePath, item.Url), UriKind.Relative),
+                Weight = item.Weight,
+                Item = item
+            });
             var rootNodes = new List<NavigationNode>();
             var sectionLookup = new Dictionary<string, List<NavigationNode>>(StringComparer.Ordinal);
             var sectionSampleItems = new Dictionary<string, ContentItem>(StringComparer.Ordinal);
@@ -33,12 +42,12 @@ public static class NavigationTreeBuilder
                     ? []
                     : item.SectionPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
 
-                var leaf = new NavigationNode
+                var leaf = leaves[item];
+                if (parents.TryGetValue(item, out var parent))
                 {
-                    Title = item.Title,
-                    Url = new Uri(SiteConfiguration.ApplyBasePath(basePath, item.Url), UriKind.Relative),
-                    Weight = item.Weight
-                };
+                    leaves[parent].Children.Add(leaf);
+                    continue;
+                }
 
                 if (segs.Length == 0)
                 {
@@ -70,11 +79,11 @@ public static class NavigationTreeBuilder
             }
 
             // Second pass: assign leaf children
-            foreach (var (sectionPath, leaves) in sectionLookup)
+            foreach (var (sectionPath, sectionLeaves) in sectionLookup)
             {
                 if (sectionChildren.TryGetValue(sectionPath, out var children))
                 {
-                    children.AddRange(leaves);
+                    children.AddRange(sectionLeaves);
                 }
             }
 
@@ -132,11 +141,60 @@ public static class NavigationTreeBuilder
                 return cmp != 0 ? cmp : string.Compare(a.Title, b.Title, StringComparison.OrdinalIgnoreCase);
             });
 
+            foreach (var leaf in leaves.Values)
+            {
+                leaf.Children.Sort((a, b) =>
+                {
+                    var cmp = a.Weight.CompareTo(b.Weight);
+                    return cmp != 0 ? cmp : string.Compare(a.Title, b.Title, StringComparison.OrdinalIgnoreCase);
+                });
+            }
+
             result[group.Key] = rootNodes;
         }
 
         return result;
     }
+
+    private static Dictionary<ContentItem, ContentItem> ResolveParents(List<ContentItem> items)
+    {
+        var paths = items.ToLookup(item => item.RelativePath, StringComparer.Ordinal);
+        var ids = items
+            .Where(item => Guid.TryParse(item.Id, out _))
+            .ToLookup(item => Guid.Parse(item.Id!));
+        var parents = new Dictionary<ContentItem, ContentItem>();
+
+        foreach (var item in items.Where(item => item.Parent is not null))
+        {
+            var value = item.Parent!;
+            List<ContentItem> matches = [];
+            if (value.EndsWith(".md", StringComparison.Ordinal))
+                matches = paths[value].ToList();
+            else if (Guid.TryParse(value, out var id))
+                matches = ids[id].ToList();
+            if (matches.Count != 1)
+                throw InvalidParent(item, "expected exactly one published target in the same collection");
+            parents.Add(item, matches[0]);
+        }
+
+        var validated = new HashSet<ContentItem>();
+        foreach (var item in parents.Keys)
+        {
+            var chain = new HashSet<ContentItem>();
+            var current = item;
+            while (!validated.Contains(current) && parents.TryGetValue(current, out var parent))
+            {
+                if (!chain.Add(current))
+                    throw InvalidParent(current, "navigation parent cycle");
+                current = parent;
+            }
+            validated.UnionWith(chain);
+        }
+        return parents;
+    }
+
+    private static InvalidOperationException InvalidParent(ContentItem item, string reason)
+        => new($"Invalid parent '{item.Parent}' in '{item.SourcePath}': {reason}.");
 
     private static void EnsureSectionNode(
         string sectionPath,
@@ -156,6 +214,7 @@ public static class NavigationTreeBuilder
         {
             Title = title,
             Url = url,
+            SectionPath = sectionPath,
             Weight = 0
         };
 
@@ -174,7 +233,7 @@ public static class NavigationTreeBuilder
     /// Builds the URL for a section node derived from the URL structure of a sample item belonging to that section subtree.
     /// If all items in a section have URL overrides, the sample item's overridden URL is used as fallback.
     /// </summary>
-    private static Uri BuildSectionUrl(ContentItem sampleItem, string[] sectionSegs, string basePath)
+    internal static Uri BuildSectionUrl(ContentItem sampleItem, string[] sectionSegs, string basePath)
     {
         var sep = Path.AltDirectorySeparatorChar;
         var siteRelativeUrl = SiteConfiguration.RemoveBasePath(sampleItem.Url, basePath);

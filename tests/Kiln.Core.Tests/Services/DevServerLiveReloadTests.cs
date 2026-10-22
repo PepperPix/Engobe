@@ -30,6 +30,76 @@ public class DevServerLiveReloadTests
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(8);
 
     [Test]
+    [Arguments("missing.md")]
+    [Arguments("a869d67a-e4e1-48c5-a08c-75241df633d1")]
+    public async Task RunAsync_InvalidParentAtStartup_ReportsBuildError(string reference)
+    {
+        var project = CreateRenderableSite();
+        try
+        {
+            var source = Path.Combine(project, "content", "posts", "hello-world.md");
+            await File.WriteAllTextAsync(source, $"---\ntitle: Hello World\nparent: {reference}\n---\nBody");
+            var builder = CreateRealSiteBuilder();
+            var build = await builder.BuildAsync(project);
+            await Assert.That(build.Success).IsFalse();
+            var server = new DevServer(builder, new SiteConfigLoader(), new RecordingSearchIndexer());
+            await Assert.That(() => server.RunAsync(project, GetFreePort()))
+                .ThrowsExactly<InvalidOperationException>()
+                .WithMessageContaining(source)
+                .And.WithMessageContaining(reference)
+                .And.WithMessageContaining(build.Errors[0]);
+        }
+        finally
+        {
+            Directory.Delete(project, true);
+        }
+    }
+
+    [Test]
+    public async Task RunAsync_InvalidParentOnFullRebuild_StreamsSameBuildErrorAndRecovers()
+    {
+        var project = CreateRenderableSite();
+        var builder = CreateRealSiteBuilder();
+        var server = new DevServer(builder, new SiteConfigLoader(), new RecordingSearchIndexer());
+        var port = GetFreePort();
+        using var cts = new CancellationTokenSource();
+        var run = server.RunAsync(project, port, ct: cts.Token);
+        try
+        {
+            using var client = new HttpClient();
+            await WaitForServerReadyAsync(client, port, DefaultTimeout);
+            var output = Path.Combine(project, "_site", "blog", "hello-world", "index.html");
+            var originalHtml = await File.ReadAllTextAsync(output);
+            using var response = await client.GetAsync(
+                $"http://localhost:{port}{LiveReloadEndpoint}", HttpCompletionOption.ResponseHeadersRead, cts.Token);
+            await using var stream = await response.Content.ReadAsStreamAsync(cts.Token);
+            using var reader = new StreamReader(stream, Encoding.UTF8);
+            var source = Path.Combine(project, "content", "posts", "hello-world.md");
+            const string reference = "missing.md";
+            await File.WriteAllTextAsync(source, $"---\ntitle: Hello World\nparent: {reference}\n---\nBody", CancellationToken.None);
+            var error = await ReadNextSseEventAsync(reader, DefaultTimeout);
+            await Assert.That(error.EventName).IsEqualTo("error");
+            await Assert.That(error.Data).Contains(source);
+            await Assert.That(error.Data).Contains(reference);
+            var build = await builder.BuildAsync(project);
+            await Assert.That(build.Success).IsFalse();
+            await Assert.That(error.Data).Contains(build.Errors[0]);
+            await Assert.That(await File.ReadAllTextAsync(output)).IsEqualTo(originalHtml);
+
+            await File.WriteAllTextAsync(source, "---\ntitle: Hello World\n---\nRecovered", CancellationToken.None);
+            var recovered = await ReadNextSseEventAsync(reader, DefaultTimeout);
+            await Assert.That(recovered.EventName).IsEqualTo("reload");
+            await Assert.That(await File.ReadAllTextAsync(output)).Contains("Recovered");
+        }
+        finally
+        {
+            await cts.CancelAsync();
+            await run.WaitAsync(TimeSpan.FromSeconds(3));
+            Directory.Delete(project, true);
+        }
+    }
+
+    [Test]
     public async Task RunAsync_DebouncesChanges_AndUsesSingleFlightRebuilds()
     {
         var projectDir = CreateWatchedProject();
