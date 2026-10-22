@@ -70,18 +70,22 @@ internal static class VirtualPageCatalog
     internal static List<string> CollectVirtualUrls(
         SiteConfiguration config,
         Dictionary<string, IReadOnlyList<TaxonomyTerm>> allTaxonomyTerms,
-        bool includeDrafts)
+        bool includeDrafts,
+        string themePath)
     {
         var urls = new List<string>();
 
         // Collection index pages
         foreach (var collection in config.Collections.Values)
         {
-            if (!(collection.Paginate > 0)) continue;
+            var isPaginated = collection.Paginate is > 0;
+            if (!isPaginated && !TemplateRenderer.HasCollectionIndexLayout(themePath, collection.Name)) continue;
             var nonDraftCount = collection.Items.Count(i => !i.Draft || includeDrafts);
             if (nonDraftCount == 0) continue;
 
-            var totalPages = (int)Math.Ceiling(nonDraftCount / (double)collection.Paginate!.Value);
+            var totalPages = isPaginated
+                ? (int)Math.Ceiling(nonDraftCount / (double)collection.Paginate!.Value)
+                : 1;
             var indexUrl = collection.IndexUrl;
             urls.Add(indexUrl.OriginalString);
             for (var p = 2; p <= totalPages; p++)

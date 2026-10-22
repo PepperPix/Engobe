@@ -33,7 +33,7 @@ public sealed class ContentGroup
     /// <summary>Gets whether a feed is generated for the collection.</summary>
     public bool Feed { get; init; }
 
-    /// <summary>Gets the number of items per index page. When unset or not positive, no index pages are rendered for the collection.</summary>
+    /// <summary>Gets the number of items per index page. Positive values enable pagination; otherwise, an index page requires a collection-specific theme layout.</summary>
     public int? Paginate { get; init; }
 
     /// <summary>Gets the name of the layout used for items that do not set their own <see cref="ContentItem.Layout"/>. The default is <c>default</c>.</summary>

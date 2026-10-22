@@ -11,7 +11,8 @@ internal static class SitemapGenerator
         SiteConfiguration config,
         IReadOnlyList<ContentItem> allItems,
         IReadOnlyDictionary<string, IReadOnlyList<TaxonomyTerm>> allTaxonomyTerms,
-        bool includeDrafts)
+        bool includeDrafts,
+        string themePath)
     {
         var baseUrl = config.Origin;
         var buildDate = DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
@@ -33,15 +34,18 @@ internal static class SitemapGenerator
             WriteUrl(writer, $"{baseUrl}{item.Url.OriginalString}", lastmod);
         }
 
-        // Collection index pages (paginated)
+        // Collection index pages
         foreach (var collection in config.Collections.Values)
         {
-            if (!(collection.Paginate > 0)) continue;
+            var isPaginated = collection.Paginate is > 0;
+            if (!isPaginated && !TemplateRenderer.HasCollectionIndexLayout(themePath, collection.Name)) continue;
             var nonDraftCount = allItems.Count(
                 i => i.Collection.Name == collection.Name && (!i.Draft || includeDrafts));
             if (nonDraftCount == 0) continue;
 
-            var totalPages = (int)Math.Ceiling(nonDraftCount / (double)collection.Paginate!.Value);
+            var totalPages = isPaginated
+                ? (int)Math.Ceiling(nonDraftCount / (double)collection.Paginate!.Value)
+                : 1;
             var indexUrl = SiteConfiguration.ApplyBasePath(config.BasePath, collection.IndexUrl);
 
             WriteUrl(writer, $"{baseUrl}{indexUrl}", buildDate);

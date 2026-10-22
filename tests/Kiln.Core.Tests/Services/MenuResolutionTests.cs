@@ -31,6 +31,40 @@ public class MenuResolutionTests
     }
 
     [Test]
+    public async Task BuildAsync_MenuRef_UnpaginatedCollectionIndex_Resolved()
+    {
+        var dir = CreateSiteWithMenus(
+            """
+            menus:
+              main:
+                - title: Blog
+                  ref: posts/
+            """,
+            paginate: false,
+            includeCollectionIndexLayout: true);
+
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(dir, "content", "posts", "post.md"),
+                """
+                ---
+                title: Post
+                ---
+                Content
+                """);
+
+            var result = await CreateBuilder().BuildAsync(dir);
+
+            await Assert.That(result.Success).IsTrue();
+            await Assert.That(result.Errors.Count).IsEqualTo(0);
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Test]
     public async Task BuildAsync_MenuRef_ItemSlug_Resolved()
     {
         var dir = CreateSiteWithMenus(
@@ -158,7 +192,10 @@ public class MenuResolutionTests
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private static string CreateSiteWithMenus(string menusYaml)
+    private static string CreateSiteWithMenus(
+        string menusYaml,
+        bool paginate = true,
+        bool includeCollectionIndexLayout = false)
     {
         var dir = Path.Combine(Path.GetTempPath(), $"kiln-menu-{Guid.NewGuid():N}");
         Directory.CreateDirectory(Path.Combine(dir, "content", "posts"));
@@ -166,6 +203,7 @@ public class MenuResolutionTests
         Directory.CreateDirectory(Path.Combine(dir, "themes", "default", "layouts"));
         Directory.CreateDirectory(Path.Combine(dir, "themes", "default", "partials"));
 
+        var paginateClause = paginate ? "paginate: 10" : "";
         File.WriteAllText(Path.Combine(dir, "site.yaml"),
             $"""
             title: Test Site
@@ -174,7 +212,7 @@ public class MenuResolutionTests
               posts:
                 directory: content/posts
                 permalink: /blog/:slug/
-                paginate: 10
+                {paginateClause}
               pages:
                 directory: content/pages
                 permalink: /:slug/
@@ -193,6 +231,9 @@ public class MenuResolutionTests
             "<html>{{ page.content }}</html>");
         File.WriteAllText(Path.Combine(dir, "themes", "default", "layouts", "404.html"),
             "<html>Not Found</html>");
+        if (includeCollectionIndexLayout)
+            File.WriteAllText(Path.Combine(dir, "themes", "default", "layouts", "posts-index.html"),
+                "{{ for item in paginator.items }}{{ item.title }}{{ end }}");
 
         return dir;
     }

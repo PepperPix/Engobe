@@ -171,6 +171,36 @@ public class SiteConfigLoaderTests
             var config = _loader.Load(dir);
 
             await Assert.That(config.Collections["posts"].Directory).IsEqualTo(Path.Combine("content", "posts"));
+            await Assert.That(config.Collections["posts"].Paginate).IsNull();
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Test]
+    [Arguments("false", true, 0)]
+    [Arguments("0", false, 0)]
+    [Arguments("7", false, 7)]
+    public async Task Load_CollectionPaginate_FalseAndIntegers(string paginate, bool expectedNull, int expected)
+    {
+        var dir = await CreateTempSiteAsync($"""
+            title: Test
+            baseUrl: http://localhost
+            collections:
+              posts:
+                paginate: {paginate}
+            """);
+
+        try
+        {
+            var config = _loader.Load(dir);
+
+            if (expectedNull)
+                await Assert.That(config.Collections["posts"].Paginate).IsNull();
+            else
+                await Assert.That(config.Collections["posts"].Paginate).IsEqualTo(expected);
         }
         finally
         {

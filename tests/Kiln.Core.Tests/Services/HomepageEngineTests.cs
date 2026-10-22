@@ -69,6 +69,67 @@ public class HomepageEngineTests
     }
 
     [Test]
+    public async Task BuildAsync_HomePageAndUnpaginatedCollectionIndex_RenderSeparately()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"kiln-home-page-collection-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(dir, "content", "posts"));
+        Directory.CreateDirectory(Path.Combine(dir, "themes", "default", "layouts"));
+        Directory.CreateDirectory(Path.Combine(dir, "themes", "default", "partials"));
+
+        await File.WriteAllTextAsync(Path.Combine(dir, "site.yaml"),
+            """
+            title: Test Site
+            baseUrl: http://localhost:5555
+            collections:
+              posts:
+                directory: content/posts
+                permalink: /blog/:slug/
+            home:
+              page: content/index.md
+            """);
+        await File.WriteAllTextAsync(Path.Combine(dir, "content", "index.md"),
+            """
+            ---
+            title: Home
+            ---
+            Welcome home.
+            """);
+        await File.WriteAllTextAsync(Path.Combine(dir, "content", "posts", "post-1.md"),
+            """
+            ---
+            title: Collection post
+            ---
+            Collection content.
+            """);
+        await File.WriteAllTextAsync(Path.Combine(dir, "themes", "default", "layouts", "default.html"),
+            "<html>{{ page.content }}</html>");
+        await File.WriteAllTextAsync(Path.Combine(dir, "themes", "default", "layouts", "home.html"),
+            "<html>{{ page.content }}</html>");
+        await File.WriteAllTextAsync(Path.Combine(dir, "themes", "default", "layouts", "posts-index.html"),
+            "<html>{{ for item in paginator.items }}{{ item.title }}{{ end }}</html>");
+        await File.WriteAllTextAsync(Path.Combine(dir, "themes", "default", "layouts", "404.html"), "NOT_FOUND");
+
+        try
+        {
+            var result = await CreateBuilder().BuildAsync(dir);
+
+            await Assert.That(result.Success).IsTrue();
+            await Assert.That(File.Exists(Path.Combine(dir, "_site", "index.html"))).IsTrue();
+            await Assert.That(File.Exists(Path.Combine(dir, "_site", "blog", "index.html"))).IsTrue();
+            await Assert.That(File.Exists(Path.Combine(dir, "_site", "blog", "page", "2", "index.html"))).IsFalse();
+
+            var homeHtml = await File.ReadAllTextAsync(Path.Combine(dir, "_site", "index.html"));
+            var collectionHtml = await File.ReadAllTextAsync(Path.Combine(dir, "_site", "blog", "index.html"));
+            await Assert.That(homeHtml).Contains("Welcome home");
+            await Assert.That(collectionHtml).Contains("Collection post");
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Test]
     public async Task BuildAsync_HomeCollectionPromotion_RendersRootPaginationAndKeepsPostPermalinks()
     {
         const int postCount = 3;
