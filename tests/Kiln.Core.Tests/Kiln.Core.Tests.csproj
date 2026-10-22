@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Kiln.Core\Kiln.Core.csproj" />
+    <Compile Include="../Fixtures/FakeNuGetV3Feed.cs" Link="Fixtures/FakeNuGetV3Feed.cs" />
   </ItemGroup>
 
 </Project>

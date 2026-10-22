@@ -151,6 +151,14 @@ kiln plugin list
 
 Each installed plugin is recorded in `.kiln/plugins.lock.json` with the package ID, installed version, source (`nuget`), trust level and a content hash. This file is intentionally project-local and versioned so `kiln plugin update` can resolve the correct package without guessing names.
 
+### Package integrity
+
+For NuGet V3 sources, `plugin add` and `plugin update` compare all downloaded package bytes with the exact version's Base64 SHA-512 value from the PackageBaseAddress `.nupkg.sha512` sidecar before reading the ZIP archive. A mismatch or malformed hash aborts without changing the installed plugin or its lock entry, even with `--force`.
+
+A reachable source without a sidecar may still install, but the command warns with the source, package ID, and version that installation proceeded without package hash verification. Local package sources without V3 hash metadata also report this warning. Offline installation requires both cached package bytes and a matching cached SHA-512 sidecar; cached package bytes alone are not sufficient, including packages from custom feeds that omit hashes online.
+
+The lock file's `contentHash` remains the installed directory's SHA-256 hash, not the package SHA-512. No permanent unverified marker is added to the lock file or to `plugin info`/`plugin list`. A hash from the same source checks package integrity; it is not a signature, proof of authorship, or protection against a compromised source. The trust and confirmation rules below still apply.
+
 ### Trust model
 
 - The `kiln-plugin` tag is required: packages without it are never installed, and there is no override.

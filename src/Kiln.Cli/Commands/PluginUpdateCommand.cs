@@ -92,7 +92,8 @@ public sealed class PluginUpdateCommand(
 
         console.MarkupLine("[yellow]IMPORTANT:[/] This plugin can inject arbitrary HTML/JavaScript into pages. Install only plugins from trusted sources.");
 
-        if (!settings.Yes && !await ConfirmSignificantChangeAsync(projectPath, name, entry, latestVersion, cancellationToken).ConfigureAwait(false))
+        var verificationWarningReported = false;
+        if (!settings.Yes && !await ConfirmSignificantChangeAsync(projectPath, name, entry, latestVersion, ReportVerificationWarning, cancellationToken).ConfigureAwait(false))
             return false;
 
         PluginPackageInstallResult result;
@@ -102,14 +103,20 @@ public sealed class PluginUpdateCommand(
             {
                 Force = settings.Force,
                 ExistingLockEntries = await pluginLockFile.ReadAsync(projectPath, cancellationToken).ConfigureAwait(false),
+                ReportPackageVerificationWarning = ReportVerificationWarning,
             };
             result = await nuGetPluginClient.AddAsync(entry.PackageId, latestVersion, projectPath, options, cancellationToken).ConfigureAwait(false);
         }
         catch (InvalidOperationException ex)
         {
+            if (ex is PluginPackageVerificationException verification)
+                console.MarkupLine($"[yellow]WARN:[/] {Markup.Escape(verification.Warning)}");
             console.MarkupLine($"[red]ERROR:[/] Could not update '{displayName}': {Markup.Escape(ex.Message)}");
             return false;
         }
+
+        if (!verificationWarningReported && result.PackageVerificationWarning is { } warning)
+            console.MarkupLine($"[yellow]WARN:[/] {Markup.Escape(warning)}");
 
         await pluginLockFile.SetAsync(projectPath, result.PluginName, new PluginLockEntry(
             result.PackageId,
@@ -122,18 +129,28 @@ public sealed class PluginUpdateCommand(
 
         console.MarkupLine($"[green]Updated plugin:[/] {Markup.Escape(result.PluginName)} ({Markup.Escape(result.PackageId)} {Markup.Escape(result.Version)}) at {Markup.Escape(result.InstallPath)}");
         return true;
+
+        void ReportVerificationWarning(string message)
+        {
+            if (!verificationWarningReported)
+                console.MarkupLine($"[yellow]WARN:[/] {Markup.Escape(message)}");
+            verificationWarningReported = true;
+        }
     }
 
-    private async Task<bool> ConfirmSignificantChangeAsync(string projectPath, string name, PluginLockEntry entry, string latestVersion, CancellationToken cancellationToken)
+    private async Task<bool> ConfirmSignificantChangeAsync(
+        string projectPath, string name, PluginLockEntry entry, string latestVersion, Action<string> reportWarning, CancellationToken cancellationToken)
     {
         var displayName = Markup.Escape(name);
         PluginPackageInfo info;
         try
         {
-            info = await nuGetPluginClient.GetInfoAsync(entry.PackageId, latestVersion, cancellationToken).ConfigureAwait(false);
+            info = await nuGetPluginClient.GetInfoAsync(entry.PackageId, latestVersion, reportWarning, cancellationToken).ConfigureAwait(false);
         }
         catch (InvalidOperationException ex)
         {
+            if (ex is PluginPackageVerificationException verification)
+                console.MarkupLine($"[yellow]WARN:[/] {Markup.Escape(verification.Warning)}");
             console.MarkupLine($"[red]ERROR:[/] Could not update '{displayName}': {Markup.Escape(ex.Message)}");
             return false;
         }

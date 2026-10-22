@@ -57,4 +57,11 @@ public interface INuGetPluginClient
     /// </summary>
     Task<PluginPackageInfo> GetInfoAsync(string packageId, string? version, CancellationToken ct = default)
         => throw new NotSupportedException($"{GetType().Name} does not support package inspection.");
+
+    /// <summary>
+    /// Describes a package and reports missing package hash verification before archive inspection.
+    /// Implementations that predate warning reporting fall back to the overload without a callback.
+    /// </summary>
+    Task<PluginPackageInfo> GetInfoAsync(string packageId, string? version, Action<string> reportPackageVerificationWarning, CancellationToken ct = default)
+        => GetInfoAsync(packageId, version, ct);
 }
