@@ -60,7 +60,8 @@ public class AssetPipelineIntegrationTests
             var foreignPort = new UriBuilder(prefix) { Port = 444 }.Uri.AbsoluteUri + "missing.svg";
             await File.WriteAllTextAsync(contentPath, (await File.ReadAllTextAsync(contentPath))
                 .Replace("/assets/", prefix, StringComparison.Ordinal)
-                + $"\n<img src=\"{foreignPath}\"><img src=\"{foreignHost}\"><img src=\"{foreignPort}\">");
+                + $"\n<img src=\"{foreignPath}\"><img src=\"{foreignHost}\"><img src=\"{foreignPort}\">"
+                + "\n<img id=\"descriptor-free-srcset\" srcset=\"/assets/images/picture.svg, /assets/images/picture.svg 2x\">");
             var cssPath = Path.Combine(dir, "themes", "default", "static", "css", "site.css");
             await File.WriteAllTextAsync(cssPath,
                 $"@import '{prefix}css/base.css' screen; .image {{ background: url('{prefix}images/picture.svg?v=2#hero'); }}"
@@ -75,6 +76,8 @@ public class AssetPipelineIntegrationTests
             await Assert.That(document.QuerySelector("img")!.GetAttribute("src")).IsEqualTo("/docs/assets/images/picture.svg");
             await Assert.That(document.QuerySelector("img")!.GetAttribute("srcset"))
                 .IsEqualTo("/docs/assets/images/picture.svg 1x, https://external.example/picture.svg 2x, data:image/svg+xml,%3Csvg%3E 3x");
+            await Assert.That(document.QuerySelector("#descriptor-free-srcset")!.GetAttribute("srcset"))
+                .IsEqualTo("/docs/assets/images/picture.svg, /docs/assets/images/picture.svg 2x");
             await Assert.That(document.QuerySelector("video")!.GetAttribute("poster")).IsEqualTo("/docs/assets/images/picture.svg");
             await Assert.That(html).Contains(foreignPath);
             await Assert.That(html).Contains(foreignHost);
@@ -87,6 +90,7 @@ public class AssetPipelineIntegrationTests
             await Assert.That(css).Contains(foreignPath);
             var feed = XDocument.Load(Path.Combine(dir, "_site", "blog", "feed.xml"));
             var feedHtml = feed.Descendants().Single(element => element.Name.LocalName == "content").Value;
+            await Assert.That(feedHtml).DoesNotContain("<html");
             var feedDocument = await new HtmlParser().ParseDocumentAsync(feedHtml);
             await Assert.That(feedDocument.QuerySelector("img")!.GetAttribute("src"))
                 .IsEqualTo("https://example.org/docs/assets/images/picture.svg");

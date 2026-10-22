@@ -215,7 +215,7 @@ public sealed class TemplateRenderer : ITemplateRenderer
         pageObj.Add("id", item.Id);
         pageObj.Add("title", item.Title);
         pageObj.Add("date", item.Date);
-        pageObj.Add("content", HtmlAssetReferenceRewriter.Rewrite(item.HtmlContent, shared.AssetUrls));
+        pageObj.Add("content", HtmlAssetReferenceRewriter.RewriteFragment(item.HtmlContent, shared.AssetUrls));
         pageObj.Add("url", SiteConfiguration.ApplyBasePath(site.BasePath, itemUrl));
         pageObj.Add("slug", item.Slug);
         pageObj.Add("description", item.Description);

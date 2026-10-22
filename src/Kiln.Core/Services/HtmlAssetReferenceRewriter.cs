@@ -7,14 +7,35 @@ internal static class HtmlAssetReferenceRewriter
 {
     private static readonly string[] Attributes = ["src", "href", "poster"];
 
-    internal static string Rewrite(
+    internal static string RewriteDocument(
         string html,
         AssetUrlResolver resolver,
         IReadOnlyDictionary<string, string>? manifest = null,
-        bool absoluteForLocal = false)
+        bool absoluteForLocal = false) =>
+        Rewrite(html, resolver, manifest, absoluteForLocal, isFragment: false);
+
+    internal static string RewriteFragment(
+        string html,
+        AssetUrlResolver resolver,
+        IReadOnlyDictionary<string, string>? manifest = null,
+        bool absoluteForLocal = false) =>
+        Rewrite(html, resolver, manifest, absoluteForLocal, isFragment: true);
+
+    private static string Rewrite(
+        string html,
+        AssetUrlResolver resolver,
+        IReadOnlyDictionary<string, string>? manifest,
+        bool absoluteForLocal,
+        bool isFragment)
     {
         var parser = new HtmlParser();
-        var document = parser.ParseDocument(html);
+        var document = parser.ParseDocument(isFragment ? string.Empty : html);
+        var fragmentContainer = isFragment
+            ? document.Body ?? throw new InvalidOperationException("AngleSharp did not create a document body.")
+            : null;
+        if (fragmentContainer is not null)
+            fragmentContainer.InnerHtml = html;
+
         var changed = false;
         foreach (var element in document.All)
         {
@@ -43,7 +64,7 @@ internal static class HtmlAssetReferenceRewriter
             }
         }
 
-        return changed ? document.ToHtml() : html;
+        return changed ? fragmentContainer?.InnerHtml ?? document.ToHtml() : html;
     }
 
     internal static string RewriteSrcset(
@@ -69,9 +90,13 @@ internal static class HtmlAssetReferenceRewriter
             var urlEnd = index;
             while (urlEnd > urlStart && srcset[urlEnd - 1] == ',')
                 urlEnd--;
+            var hasTrailingComma = urlEnd < index;
             var candidateUrl = srcset[urlStart..urlEnd];
             output.Append(resolver.Project(candidateUrl, manifest, absoluteForLocal));
             output.Append(srcset.AsSpan(urlEnd, index - urlEnd));
+
+            if (hasTrailingComma)
+                continue;
 
             var descriptorStart = index;
             var parenthesisDepth = 0;

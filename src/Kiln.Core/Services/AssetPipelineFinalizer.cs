@@ -249,7 +249,7 @@ internal static class AssetPipelineFinalizer
         foreach (var htmlFile in Directory.EnumerateFiles(outputDir, "*.html", SearchOption.AllDirectories))
         {
             var html = File.ReadAllText(htmlFile);
-            var rewritten = HtmlAssetReferenceRewriter.Rewrite(html, resolver, manifest);
+            var rewritten = HtmlAssetReferenceRewriter.RewriteDocument(html, resolver, manifest);
             if (!string.Equals(html, rewritten, StringComparison.Ordinal))
                 File.WriteAllText(htmlFile, rewritten, new UTF8Encoding(false));
         }
@@ -280,7 +280,7 @@ internal static class AssetPipelineFinalizer
                      && string.Equals((string?)element.Attribute("type"), "html", StringComparison.OrdinalIgnoreCase)))
         {
             var original = element.Value;
-            var rewritten = HtmlAssetReferenceRewriter.Rewrite(original, resolver, manifest, absoluteFeedAssets);
+            var rewritten = HtmlAssetReferenceRewriter.RewriteFragment(original, resolver, manifest, absoluteFeedAssets);
             if (string.Equals(original, rewritten, StringComparison.Ordinal))
                 continue;
             element.Value = rewritten;

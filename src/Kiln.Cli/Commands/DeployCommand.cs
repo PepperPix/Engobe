@@ -28,7 +28,7 @@ public sealed class DeployCommand(IDeploymentInitializer deploymentInitializer, 
         var projectPath = System.IO.Path.GetFullPath(settings.Path);
         if (!TryParseTarget(settings.Target, out var target))
         {
-            console.MarkupLine($"[red]Error:[/] Unknown deployment target: {settings.Target}. Supported: github-pages, azure-swa.");
+            console.MarkupLine($"[red]Error:[/] Unknown deployment target: {Markup.Escape(settings.Target)}. Supported: github-pages, azure-swa.");
             return 1;
         }
 
@@ -38,13 +38,13 @@ public sealed class DeployCommand(IDeploymentInitializer deploymentInitializer, 
             foreach (var createdFile in result.CreatedFiles)
             {
                 var fullPath = Path.Combine(projectPath, Path.Combine(createdFile.Split('/')));
-                console.MarkupLine($"[green]Created[/] [blue]{fullPath}[/]");
+                console.MarkupLine($"[green]Created[/] [blue]{Markup.Escape(fullPath)}[/]");
             }
 
             foreach (var skippedFile in result.SkippedFiles)
             {
                 var fullPath = Path.Combine(projectPath, Path.Combine(skippedFile.Split('/')));
-                console.MarkupLine($"[yellow]Skipped (exists)[/] [blue]{fullPath}[/] - use --force to overwrite");
+                console.MarkupLine($"[yellow]Skipped (exists)[/] [blue]{Markup.Escape(fullPath)}[/] - use --force to overwrite");
             }
 
             return 0;
@@ -89,7 +89,7 @@ public sealed class DeployCommand(IDeploymentInitializer deploymentInitializer, 
 
     private int WriteError(string message)
     {
-        console.MarkupLine($"[red]Error:[/] {message}");
+        console.MarkupLine($"[red]Error:[/] {Markup.Escape(message)}");
         return 1;
     }
 }

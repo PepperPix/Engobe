@@ -582,6 +582,7 @@ public class ContentReaderTests
             ![Escape](../outside.png)
 
             [Download](./downloads/setup.zip?download=1#file)
+            [Ampersand](downloads/a&b.zip)
             [README](images/manual/README.MD)
             [Diagram](images/manual/diagram.svg)
             [Child asset](child/photo.png)
@@ -591,6 +592,7 @@ public class ContentReaderTests
             """).ConfigureAwait(false);
         await WriteBundleFileAsync(bundleDir, "images/screens/x.jpg").ConfigureAwait(false);
         await WriteBundleFileAsync(bundleDir, "downloads/setup.zip").ConfigureAwait(false);
+        await WriteBundleFileAsync(bundleDir, "downloads/a&b.zip").ConfigureAwait(false);
         await WriteBundleFileAsync(bundleDir, "child/index.md", "not a page").ConfigureAwait(false);
         await WriteBundleFileAsync(bundleDir, "child/photo.png").ConfigureAwait(false);
         await WriteBundleFileAsync(bundleDir, "images/manual/README.MD", "not a page").ConfigureAwait(false);
@@ -613,6 +615,7 @@ public class ContentReaderTests
             await Assert.That(html).Contains($"src=\"{assetBase}child/photo.png\"");
             await Assert.That(html).Contains($"src=\"{assetBase}images/missing.jpg\"");
             await Assert.That(html).Contains($"href=\"{assetBase}downloads/setup.zip?download=1#file\"");
+            await Assert.That(html).Contains($"href=\"{assetBase}downloads/a&amp;b.zip\"");
             await Assert.That(html).Contains($"href=\"{assetBase}child/photo.png\"");
             await Assert.That(html).Contains("src=\"child/index.md\"");
             await Assert.That(html).Contains("href=\"images/manual/README.MD\"");

@@ -37,16 +37,18 @@ public class DeployCommandForceTests
     public async Task DeployCommand_SkippedFiles_AreReportedWithExitCodeZero()
     {
         var (app, console, initializer) = CreateApp();
+        var projectPath = Path.Combine(Path.GetTempPath(), "[red]release[/]");
         initializer.Result = new DeploymentInitResult(DeploymentTarget.AzureStaticWebApps, ["staticwebapp.config.json"])
         {
             SkippedFiles = [".github/workflows/azure-swa.yml"],
         };
 
-        var result = await app.RunAsync(["deploy", "azure-swa"]);
+        var result = await app.RunAsync(["deploy", "azure-swa", "--path", projectPath]);
 
         await Assert.That(result.ExitCode).IsEqualTo(0);
         await Assert.That(console.Output).Contains("Created");
         await Assert.That(console.Output).Contains("staticwebapp.config.json");
+        await Assert.That(console.Output).Contains(projectPath);
         await Assert.That(console.Output).Contains("Skipped (exists)");
         await Assert.That(console.Output).Contains("azure-swa.yml");
         await Assert.That(console.Output).Contains("--force");

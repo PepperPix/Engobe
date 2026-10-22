@@ -1,5 +1,6 @@
 namespace Kiln.Services;
 
+using System.Net;
 using System.Text.RegularExpressions;
 using Markdig;
 
@@ -111,13 +112,13 @@ public sealed partial class MarkdownProcessor : IMarkdownProcessor
         return BundleReferenceAttributeRegex().Replace(html, match =>
         {
             var attributePrefix = match.Groups[1].Value;
-            var destination = match.Groups[2].Value;
+            var destination = WebUtility.HtmlDecode(match.Groups[2].Value);
             var closingQuote = match.Groups[3].Value;
             var isImage = attributePrefix.StartsWith("<img", StringComparison.OrdinalIgnoreCase);
             var resolvedDestination = resolveBundleReference(destination, isImage);
             return resolvedDestination is null
                 ? match.Value
-                : attributePrefix + resolvedDestination + closingQuote;
+                : attributePrefix + WebUtility.HtmlEncode(resolvedDestination) + closingQuote;
         });
     }
 }
