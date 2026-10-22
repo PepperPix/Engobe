@@ -11,4 +11,4 @@
 - [x] 2.2 Run `dotnet test` (without `rtk`) and confirm all TUnit tests pass.
 - [x] 2.3 Run `jb inspectcode Kiln.slnx -e=WARNING -f=Text` and confirm zero findings.
 - [x] 2.4 Run an end-to-end check in a temporary directory: `kiln new`, then `kiln build` without homepage configuration; verify the successful build and the empty-root warning, then clean up that directory specifically.
-- [ ] 2.5 Inspect `rtk git show --stat HEAD` and confirm that the file set contains no unexpected changes.
+- [x] 2.5 Inspect `rtk git show --stat HEAD` and confirm that the file set contains no unexpected changes.
