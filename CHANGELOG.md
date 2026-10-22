@@ -1,3 +1,10 @@
+# [2.0.0-beta.3](https://github.com/PepperPix/Kiln/compare/v2.0.0-beta.2...v2.0.0-beta.3) (2026-10-22)
+
+
+### Bug Fixes
+
+* **core:** warn when no homepage is configured ([#46](https://github.com/PepperPix/Kiln/issues/46)) ([83f5bac](https://github.com/PepperPix/Kiln/commit/83f5baccac1b12a9b9fa9c3c719d351fc86b8623))
+
 # [2.0.0-beta.2](https://github.com/PepperPix/Kiln/compare/v2.0.0-beta.1...v2.0.0-beta.2) (2026-10-22)
 
 
