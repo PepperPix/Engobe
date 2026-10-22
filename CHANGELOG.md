@@ -1,3 +1,19 @@
+# [2.0.0-beta.1](https://github.com/PepperPix/Kiln/compare/v1.3.0-beta.9...v2.0.0-beta.1) (2026-10-21)
+
+
+* feat(assets)!: support cdn asset prefixes ([c548938](https://github.com/PepperPix/Kiln/commit/c5489384060be8a901ad613732affb435809a9a8))
+
+
+### Bug Fixes
+
+* **assets:** make validation tests portable on windows ([67915e3](https://github.com/PepperPix/Kiln/commit/67915e38bd89ae80a454542126f17ced6c437957))
+
+
+### BREAKING CHANGES
+
+* site.asset_prefix now includes the site base path and a trailing slash.
+Remove additional base-path composition from custom themes.
+
 # [1.3.0-beta.9](https://github.com/PepperPix/Kiln/compare/v1.3.0-beta.8...v1.3.0-beta.9) (2026-10-19)
 
 

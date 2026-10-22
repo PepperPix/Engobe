@@ -108,7 +108,7 @@ public sealed class SiteConfigLoader : ISiteConfigLoader
             BaseUrl = new Uri(dto.RootAddress!),
             Language = dto.Language ?? "en",
             Theme = dto.Theme ?? "default",
-            AssetPrefix = dto.AssetPrefix ?? "/assets/",
+            AssetPrefix = AssetUrlResolver.NormalizePrefix(dto.AssetPrefix ?? AssetUrlResolver.CanonicalPrefix),
             OutputDir = dto.OutputDir ?? "_site",
             ThemesDir = dto.ThemesDir ?? "themes",
             Collections = collections,

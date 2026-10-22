@@ -22,6 +22,29 @@ kiln build
 kiln serve
 ```
 
+## Asset URLs and CDN hosting
+
+Kiln always writes site, theme, bundle, and plugin files to `<outputDir>/assets/` (normally `_site/assets/`). `assetPrefix` changes only their public URLs; Kiln does not upload files or configure cache headers. For example:
+
+```yaml
+baseUrl: https://example.org/docs/
+assetPrefix: https://cdn.example.com/v2/media/
+```
+
+The CDN origin must map `https://cdn.example.com/v2/media/` to the **contents** of `_site/assets/`; Kiln does not create `_site/v2/media/`. Root-relative prefixes such as `/media/` receive the site's base path once, while absolute HTTP(S) prefixes retain their own origin and path. A `--base-url` override changes local asset URLs and the site origin used for feeds, but never changes an absolute CDN prefix.
+
+Prefixes must not contain credentials, query strings, fragments, traversal segments, or raw or
+percent-encoded backslashes. Production link checking compares URL paths case-sensitively on every
+platform: `Logo.svg` does not match an output file named `logo.svg`.
+
+Use `asset_url`, `plugin_asset_url`, and `page_asset_url` in themes. **BREAKING template change:** `site.asset_prefix` is now the effective public base, including the site base path and one trailing slash. Themes that previously composed `site.base_path + site.asset_prefix` must remove that extra composition; helper-based themes need no change. `site.yaml` uses camelCase `assetPrefix`; `asset_prefix` is not a configuration alias.
+
+Production rewrites owned `src`, `href`, `srcset`, and `poster` attributes, plus CSS `url()` and both `@import` forms. Atom HTML content receives the same projection and absolute asset URLs (CDN origin or site origin for a local prefix). Query strings and fragments are preserved. Inline CSS/scripts, arbitrary example text, and JavaScript imports are not rewritten. Pagefind remains at the site-local `/pagefind/` path under the site's base path; only Kiln's own search script uses the asset prefix.
+
+Fingerprinting hashes final asset bytes; imported CSS is finalized before its importing stylesheet. A CSS dependency cycle is a build error when fingerprinting is enabled; resolve the cycle or set `build.fingerprint: false`. Prefixing still applies when fingerprinting is disabled. Production link checking is offline: it checks owned local output files after rewriting, including CSS and Atom references, and never contacts a CDN. It skips foreign external URLs and does not verify CDN reachability, CORS, or cache behavior. Set `build.linkCheck: false` to disable existence checks.
+
+In development, an absolute CDN prefix falls back to local `/assets/`; a root-relative custom prefix remains local and is served from `assets/`. References already written with the configured CDN base in supported HTML attributes, external CSS, or Atom HTML content also map to local preview URLs; unrelated hosts, ports, and neighboring paths remain unchanged. If the effective asset prefix or site base path changes while `kiln serve` is running, restart the server. Local asset namespaces may not overlap generated pages, Pagefind when enabled, or the live-reload route; choose another prefix if a build reports a collision.
+
 ## Features
 
 - Collection-based content model with nested (recursive) content sections
@@ -305,6 +328,12 @@ it through a channel you trust.
 Search is disabled by default and `kiln serve` never triggers indexing or a download. The default
 theme ships with an opt-in search UI that is self-guarded and requires no extra setup once search is
 enabled and indexed.
+
+Search indexing runs after the Core build. With search enabled, production link checking reports
+and defers missing `/pagefind/pagefind.js` and `/pagefind/pagefind-ui.css` entrypoints under the
+effective site base path. Other missing files remain errors. Run search indexing before publishing;
+`kiln build` does this automatically unless `--no-search` is passed. With search disabled, neither
+entrypoint is exempt from checking.
 
 ## Nested Content Sections
 

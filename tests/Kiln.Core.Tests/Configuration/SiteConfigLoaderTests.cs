@@ -155,6 +155,120 @@ public class SiteConfigLoaderTests
     }
 
     [Test]
+    [Arguments(@"/media\..\..\outside/")]
+    [Arguments("/media%5c..%5c..%5coutside/")]
+    [Arguments("/media%5C..%5C..%5Coutside/")]
+    [Arguments(@"/media\images/")]
+    [Arguments(@"https://cdn.example.org/media\..\..\outside/")]
+    [Arguments("https://cdn.example.org/media%5c..%5c..%5coutside/")]
+    [Arguments("https://cdn.example.org/media%5Cimages/")]
+    [Arguments(@"https://cdn.example.org\media")]
+    public async Task Load_AssetPrefixWithBackslashes_ThrowsBeforeOutput(string prefix)
+    {
+        var dir = await CreateTempSiteAsync($"title: Test\nbaseUrl: https://example.org/\nassetPrefix: '{prefix}'\n");
+        try
+        {
+            await Assert.That(() => _loader.Load(dir))
+                .ThrowsExactly<InvalidOperationException>()
+                .WithMessageContaining("assetPrefix");
+            await Assert.That(Directory.Exists(Path.Combine(dir, "_site"))).IsFalse();
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Test]
+    public async Task Load_AssetPrefixValidatesPublicUrlBase()
+    {
+            var validPrefixes = new[]
+            {
+                ("assetPrefix: /media", "/media/"),
+                ("assetPrefix: https://cdn.example.org/v2/media", "https://cdn.example.org/v2/media/"),
+                ("assetPrefix: https://cdn.example.org/assets/", "https://cdn.example.org/assets/")
+            };
+
+            foreach (var (setting, expected) in validPrefixes)
+            {
+                var dir = await CreateTempSiteAsync($"title: Test\nbaseUrl: https://example.org/docs/\n{setting}\n");
+                try
+                {
+                    await Assert.That(_loader.Load(dir).AssetPrefix).IsEqualTo(expected);
+                }
+                finally
+                {
+                    Directory.Delete(dir, true);
+                }
+            }
+
+            var aliasDir = await CreateTempSiteAsync("title: Test\nbaseUrl: https://example.org/\nasset_prefix: /legacy/\n");
+            try
+            {
+                await Assert.That(_loader.Load(aliasDir).AssetPrefix).IsEqualTo("/assets/");
+            }
+            finally
+            {
+                Directory.Delete(aliasDir, true);
+            }
+
+            var invalidPrefixes = new[]
+            {
+                "cdn.example.org/assets",
+                "//cdn.example.org/assets/",
+                "file:///private/",
+                "/../assets/",
+                "https://cdn.example.org/assets/?token=1",
+                "https://cdn.example.org/assets/#fragment",
+                "https://user:secret@cdn.example.org/assets/",
+                "ftp://cdn.example.org/assets/",
+                "https://cdn.example.org/a/%2e%2e/assets/",
+                "https://cdn.example.org/a/../assets/",
+                "/a/%2e%2e/assets/",
+                "https://user:pass@cdn.example.org/assets/",
+                "/"
+            };
+            foreach (var prefix in invalidPrefixes)
+            {
+                var dir = await CreateTempSiteAsync($"title: Test\nbaseUrl: https://example.org/\nassetPrefix: '{prefix}'\n");
+                try
+                {
+                    await Assert.That(() => _loader.Load(dir))
+                        .ThrowsExactly<InvalidOperationException>()
+                        .WithMessageContaining("assetPrefix");
+                }
+                finally
+                {
+                    Directory.Delete(dir, true);
+                }
+            }
+    }
+
+    [Test]
+    public async Task WithBaseUrl_PreservesConfiguredAssetPrefix()
+    {
+        var dir = await CreateTempSiteAsync("""
+            title: Test
+            baseUrl: https://example.org/
+            assetPrefix: https://cdn.example.org/v2/media/
+            """);
+
+        try
+        {
+            var config = _loader.Load(dir);
+            var overridden = config.WithBaseUrl(new Uri("https://example.org/docs/"));
+
+            await Assert.That(config.AssetPrefix).IsEqualTo("https://cdn.example.org/v2/media/");
+            await Assert.That(overridden.AssetPrefix).IsEqualTo(config.AssetPrefix);
+            await Assert.That(overridden.BasePath).IsEqualTo("/docs");
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Test]
     public async Task Load_CollectionWithoutExplicitDirectory_UsesNativeSeparator()
     {
         var dir = await CreateTempSiteAsync("""

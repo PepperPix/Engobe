@@ -13,4 +13,5 @@ internal sealed record RenderPassContext(
     string ThemePath,
     IReadOnlyList<PluginDefinition> Plugins,
     string OutputDir,
-    HashSet<string>? GeneratedFiles);
+    HashSet<string>? GeneratedFiles,
+    Dictionary<string, string> AssetManifest);

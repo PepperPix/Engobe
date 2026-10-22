@@ -27,6 +27,9 @@ public class ScaffolderTests
             await Assert.That(result.CreatedFiles).Contains("themes/default/static/css/api.css");
             await Assert.That(result.CreatedFiles).Contains("themes/default/partials/recent-posts.html");
             await Assert.That(result.CreatedFiles).Contains("themes/default/partials/search.html");
+            await Assert.That(result.CreatedFiles).Contains("themes/default/static/js/kiln-search.js");
+            var searchScript = await File.ReadAllTextAsync(Path.Combine(result.ProjectPath, "themes", "default", "static", "js", "kiln-search.js"));
+            await Assert.That(searchScript).Contains("data-pagefind-module");
 
             var siteYamlPath = Path.Combine(result.ProjectPath, "site.yaml");
             var contentIndexPath = Path.Combine(result.ProjectPath, "content", "index.md");

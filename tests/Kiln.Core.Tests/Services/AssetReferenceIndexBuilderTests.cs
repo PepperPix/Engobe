@@ -83,6 +83,27 @@ public class AssetReferenceIndexBuilderTests
     }
 
     [Test]
+    public async Task Build_AdditionalReferenceSurfacesDoNotExpandImageSelection()
+    {
+        var item = MakeItem(
+            "Canonical Image",
+            "/content/posts/canonical.md",
+            "posts",
+            """
+            <img src="/assets/img/canonical.png" srcset="/assets/img/responsive.png 2x">
+            <video poster="/assets/img/poster.png"></video>
+            <style>.example { background: url('/assets/img/css-only.png'); }</style>
+            """);
+
+        var index = _builder.Build([item]);
+
+        await Assert.That(index.Keys).Contains("/assets/img/canonical.png");
+        await Assert.That(index.Keys).DoesNotContain("/assets/img/responsive.png");
+        await Assert.That(index.Keys).DoesNotContain("/assets/img/poster.png");
+        await Assert.That(index.Keys).DoesNotContain("/assets/img/css-only.png");
+    }
+
+    [Test]
     public async Task Build_NullItems_ThrowsArgumentNullException()
     {
         await Assert.That(() => _builder.Build(null!)).ThrowsExactly<ArgumentNullException>();

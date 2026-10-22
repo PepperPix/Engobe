@@ -83,6 +83,18 @@ public class BuildCommandAppTests
     }
 
     [Test]
+    public async Task BuildCommand_ProductionBaseUrlOverride_PassesEnvironmentAndOverride()
+    {
+        var (app, _, builder, _, _) = CreateApp();
+
+        var result = await app.RunAsync(["build", ".", "--production", "--base-url", "https://example.org/docs/"]);
+
+        await Assert.That(result.ExitCode).IsEqualTo(0);
+        await Assert.That(builder.CapturedEnvironment).IsEqualTo(BuildEnvironment.Production);
+        await Assert.That(builder.CapturedBaseUrlOverride!.ToString()).IsEqualTo("https://example.org/docs/");
+    }
+
+    [Test]
     public async Task BuildCommand_InvalidBaseUrlOverride_ExitsOneWithClearMessage()
     {
         var (app, console, _, _, _) = CreateApp();

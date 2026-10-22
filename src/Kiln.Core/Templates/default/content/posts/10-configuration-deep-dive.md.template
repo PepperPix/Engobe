@@ -28,6 +28,25 @@ theme: default
 - `language`: Language code (for HTML lang attribute)
 - `theme`: Theme directory name
 
+## Public Asset URLs
+
+`assetPrefix` is the public URL base for Kiln-owned assets. Physical files always remain under `_site/assets/`; the URL path is not an output directory. For example, `https://cdn.example.com/v2/media/` must map at the CDN origin to the contents of `_site/assets/`. Kiln does not upload assets or configure CDN caching.
+
+```yaml
+baseUrl: https://example.org/docs/
+assetPrefix: /media/
+```
+
+Use `asset_url('css/site.css')`, `plugin_asset_url('search', 'js/index.js')`, and `page_asset_url('hero.jpg')` in themes. A root-relative prefix receives the base path once, while an absolute CDN prefix keeps its own origin and path. A `--base-url` override changes local asset URLs and the site origin used for feeds, not an absolute CDN base.
+
+**BREAKING template behavior:** `site.asset_prefix` now exposes the effective public base, including the base path and exactly one trailing slash. A theme that previously used `site.base_path + site.asset_prefix` must remove that extra composition. `assetPrefix` is camelCase; there is no `asset_prefix` configuration alias.
+
+Production projects owned `src`, `href`, `srcset`, and `poster` attributes, CSS `url()` and both `@import` forms, and the HTML content of Atom feeds. Feed asset URLs are absolute. Query strings and fragments are preserved. Inline CSS/scripts, arbitrary example text, and JavaScript imports are not rewritten. Pagefind stays under the site's local `/pagefind/` path; only Kiln's own search script uses the asset prefix.
+
+Fingerprints use final asset bytes, with imported CSS finalized before its importer. A CSS dependency cycle fails a fingerprinted build; resolve the cycle or deliberately set `build.fingerprint: false`. Prefix projection still applies without fingerprints. Production link checking examines local output files offline and does not verify CDN reachability, CORS, or caching; use `build.linkCheck: false` to disable existence checks.
+
+Development replaces an absolute CDN base with local `/assets/`, but preserves a root-relative custom prefix. Restart `kiln serve` after changing the prefix or effective base path. The local asset namespace cannot overlap generated pages, enabled Pagefind routes, or live reload.
+
 ## Collections
 
 ```yaml

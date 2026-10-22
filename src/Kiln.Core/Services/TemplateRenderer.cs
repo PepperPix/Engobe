@@ -193,29 +193,6 @@ public sealed class TemplateRenderer : ITemplateRenderer
         return template.Render(context);
     }
 
-    private static string CombineBasePathAndRelativePath(SiteConfiguration site, string relativePath)
-    {
-        var normalizedRelativePath = relativePath.Trim();
-        if (string.IsNullOrWhiteSpace(normalizedRelativePath))
-            return GetSiteBasePath(site.BaseUrl);
-
-        var basePath = GetSiteBasePath(site.BaseUrl);
-        var relative = normalizedRelativePath.TrimStart('/');
-
-        return string.IsNullOrEmpty(basePath)
-            ? $"/{relative}"
-            : $"{basePath}/{relative}";
-    }
-
-    private static string GetSiteBasePath(Uri baseUrl)
-    {
-        var path = baseUrl.AbsolutePath;
-        if (string.IsNullOrWhiteSpace(path) || path == "/")
-            return string.Empty;
-
-        return path.TrimEnd('/');
-    }
-
     private static ScriptObject BuildItemScriptObject(
         ContentItem item,
         SharedRenderContext shared,
@@ -238,7 +215,7 @@ public sealed class TemplateRenderer : ITemplateRenderer
         pageObj.Add("id", item.Id);
         pageObj.Add("title", item.Title);
         pageObj.Add("date", item.Date);
-        pageObj.Add("content", item.HtmlContent);
+        pageObj.Add("content", HtmlAssetReferenceRewriter.Rewrite(item.HtmlContent, shared.AssetUrls));
         pageObj.Add("url", SiteConfiguration.ApplyBasePath(site.BasePath, itemUrl));
         pageObj.Add("slug", item.Slug);
         pageObj.Add("description", item.Description);
@@ -285,10 +262,9 @@ public sealed class TemplateRenderer : ITemplateRenderer
         so.Add("page", pageObj);
 
         // Co-located asset_url for page bundles
-        var assetPrefix = site.AssetPrefix.TrimEnd('/');
         var effectiveSlug = string.IsNullOrEmpty(item.SectionPath) ? item.Slug : $"{item.SectionPath}/{item.Slug}";
         so.Import("page_asset_url", new Func<string, string>(
-            filename => CombineBasePathAndRelativePath(site, $"{assetPrefix}/content/{item.Collection.Name}/{effectiveSlug}/{filename.TrimStart('/')}")));
+            filename => shared.AssetUrls.FormatPublicAddress($"content/{item.Collection.Name}/{effectiveSlug}/{filename.TrimStart('/')}")));
 
         return so;
     }
@@ -362,9 +338,7 @@ public sealed class TemplateRenderer : ITemplateRenderer
         }));
 
         // asset_url
-        var assetPrefix = site.AssetPrefix.TrimEnd('/');
-        so.Import("asset_url", new Func<string, string>(
-            path => CombineBasePathAndRelativePath(site, $"{assetPrefix}/{path.TrimStart('/')}")));
+        so.Import("asset_url", new Func<string, string>(path => shared.AssetUrls.FormatPublicAddress(path)));
 
         var stringFunctions = new ScriptObject();
         stringFunctions.Import("base64_encode", new Func<object?, string>(value =>
@@ -376,7 +350,7 @@ public sealed class TemplateRenderer : ITemplateRenderer
 
         // plugin_asset_url
         so.Import("plugin_asset_url", new Func<string, string, string>(
-            (pluginName, path) => CombineBasePathAndRelativePath(site, $"{assetPrefix}/plugins/{pluginName}/{path.TrimStart('/')}")));
+            (pluginName, path) => shared.AssetUrls.FormatPublicAddress($"plugins/{pluginName}/{path.TrimStart('/')}")));
 
         // limit helper for concise list widgets: collections.posts.items | limit 5
         so.Import("limit", new Func<object?, int, object>((source, n) =>

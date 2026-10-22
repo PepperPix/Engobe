@@ -193,6 +193,145 @@ public class DevServerLiveReloadTests
     }
 
     [Test]
+    public async Task RunAsync_RequiresRestartWhenAssetRoutingChanges()
+    {
+            var projectDir = CreateWatchedProject();
+            var configPath = Path.Combine(projectDir, "site.yaml");
+            const string initialConfig = """
+                title: Test
+                baseUrl: http://localhost:5555/docs/
+                outputDir: _site
+                assetPrefix: /media/
+                """;
+            await File.WriteAllTextAsync(configPath, initialConfig);
+            var builder = new RecordingSiteBuilder("_site");
+            var server = new DevServer(builder, new SiteConfigLoader(), new RecordingSearchIndexer());
+            var port = GetFreePort();
+            using var cts = new CancellationTokenSource();
+            var runTask = server.RunAsync(projectDir, port, ct: cts.Token);
+
+            try
+            {
+                await builder.WaitForBuildCountAsync(1, DefaultTimeout);
+                var assetFile = Path.Combine(projectDir, "_site", "assets", "css", "site.css");
+                Directory.CreateDirectory(Path.GetDirectoryName(assetFile)!);
+                await File.WriteAllTextAsync(assetFile, "initial css bytes");
+
+                using var client = new HttpClient();
+                client.Timeout = TimeSpan.FromSeconds(4);
+                await WaitForServerReadyAsync(client, port, DefaultTimeout);
+                await Assert.That(await client.GetStringAsync($"http://localhost:{port}/docs/media/css/site.css"))
+                    .IsEqualTo("initial css bytes");
+
+                using var response = await client.GetAsync(
+                    $"http://localhost:{port}{LiveReloadEndpoint}",
+                    HttpCompletionOption.ResponseHeadersRead,
+                    cts.Token);
+                await using var stream = await response.Content.ReadAsStreamAsync(cts.Token);
+                using var reader = new StreamReader(stream, Encoding.UTF8);
+
+                await File.WriteAllTextAsync(configPath, initialConfig.Replace("/media/", "/files/", StringComparison.Ordinal));
+                var prefixError = await ReadNextSseEventAsync(reader, DefaultTimeout);
+                await Assert.That(prefixError.EventName).IsEqualTo("error");
+                await Assert.That(prefixError.Data).Contains("Restart kiln serve");
+                await Task.Delay(TimeSpan.FromMilliseconds(WaitForDebounceMilliseconds));
+                await Assert.That(builder.BuildCount).IsEqualTo(1);
+                await Assert.That(await client.GetStringAsync($"http://localhost:{port}/docs/media/css/site.css"))
+                    .IsEqualTo("initial css bytes");
+                await Assert.That((int)(await client.GetAsync($"http://localhost:{port}/docs/files/css/site.css")).StatusCode)
+                    .IsEqualTo((int)HttpStatusCode.NotFound);
+
+                await File.WriteAllTextAsync(configPath, initialConfig);
+                await File.WriteAllTextAsync(Path.Combine(projectDir, "content", "posts", "hello.md"), "ordinary content update");
+                await builder.WaitForBuildCountAsync(2, DefaultTimeout);
+                var recoveredEvent = await ReadNextSseEventAsync(reader, DefaultTimeout);
+                await Assert.That(recoveredEvent.EventName).IsEqualTo("reload");
+
+                await File.WriteAllTextAsync(configPath, initialConfig.Replace("/docs/", "/publish/", StringComparison.Ordinal));
+                var basePathError = await ReadNextSseEventAsync(reader, DefaultTimeout);
+                await Assert.That(basePathError.EventName).IsEqualTo("error");
+                await Assert.That(basePathError.Data).Contains("Restart kiln serve");
+                await Assert.That(await client.GetStringAsync($"http://localhost:{port}/docs/media/css/site.css"))
+                    .IsEqualTo("initial css bytes");
+            }
+            finally
+            {
+                await cts.CancelAsync();
+                await runTask.WaitAsync(TimeSpan.FromSeconds(3));
+            }
+
+            await File.WriteAllTextAsync(
+                configPath,
+                initialConfig
+                    .Replace("/docs/", "/publish/", StringComparison.Ordinal)
+                    .Replace("/media/", "/files/", StringComparison.Ordinal));
+            var restartedPort = GetFreePort();
+            using var restartedCts = new CancellationTokenSource();
+            var restartedServer = new DevServer(builder, new SiteConfigLoader(), new RecordingSearchIndexer());
+            var restartedTask = restartedServer.RunAsync(projectDir, restartedPort, ct: restartedCts.Token);
+            try
+            {
+                await builder.WaitForBuildCountAsync(3, DefaultTimeout);
+                using var client = new HttpClient();
+                client.Timeout = TimeSpan.FromSeconds(4);
+                await WaitForServerReadyAsync(client, restartedPort, DefaultTimeout);
+                await Assert.That(await client.GetStringAsync($"http://localhost:{restartedPort}/publish/files/css/site.css"))
+                    .IsEqualTo("initial css bytes");
+            }
+            finally
+            {
+                await restartedCts.CancelAsync();
+                await restartedTask.WaitAsync(TimeSpan.FromSeconds(3));
+                Directory.Delete(projectDir, true);
+            }
+    }
+
+    [Test]
+    public async Task RunAsync_MapsCdnFallbackAndPagefindUnderSiteBasePath()
+    {
+            var projectDir = CreateWatchedProject();
+            await File.WriteAllTextAsync(
+                Path.Combine(projectDir, "site.yaml"),
+                """
+                title: Test
+                baseUrl: https://example.org/docs/
+                outputDir: _site
+                assetPrefix: https://cdn.example.com/v2/media/
+                search:
+                  enabled: true
+                """);
+            var builder = new RecordingSiteBuilder("_site");
+            var server = new DevServer(builder, new SiteConfigLoader(), new RecordingSearchIndexer());
+            var port = GetFreePort();
+            using var cts = new CancellationTokenSource();
+            var runTask = server.RunAsync(projectDir, port, ct: cts.Token);
+
+            try
+            {
+                await builder.WaitForBuildCountAsync(1, DefaultTimeout);
+                var assetPath = Path.Combine(projectDir, "_site", "assets", "css", "site.css");
+                Directory.CreateDirectory(Path.GetDirectoryName(assetPath)!);
+                await File.WriteAllTextAsync(assetPath, "local development CSS");
+
+                using var client = new HttpClient();
+                client.Timeout = TimeSpan.FromSeconds(4);
+                await WaitForServerReadyAsync(client, port, DefaultTimeout);
+                await Assert.That(await client.GetStringAsync($"http://localhost:{port}/docs/assets/css/site.css"))
+                    .IsEqualTo("local development CSS");
+                await Assert.That(await client.GetStringAsync($"http://localhost:{port}/docs/pagefind/pagefind.js"))
+                    .IsEqualTo("pagefind-marker");
+                await Assert.That(await client.GetStringAsync($"http://localhost:{port}/docs/index.html"))
+                    .Contains("ok");
+            }
+            finally
+            {
+                await cts.CancelAsync();
+                await runTask.WaitAsync(TimeSpan.FromSeconds(3));
+                Directory.Delete(projectDir, true);
+            }
+    }
+
+    [Test]
     public async Task RunAsync_IndexesPagefindAfterInitialBuildAndRebuild_WhenSearchEnabled()
     {
         var projectDir = CreateWatchedProject();
