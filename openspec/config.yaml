@@ -30,7 +30,7 @@ rules:
     - End with validation in this repository, including build, tests, inspection, and Git hygiene.
     - "Run rtk dotnet build with zero warnings or errors, dotnet test without rtk using the existing TUnit settings, and jb inspectcode Kiln.slnx -e=WARNING -f=Text with zero findings."
     - Include an end-to-end check when observable behavior changes and clean up only the files created for that check.
-    - Inspect rtk git show --stat HEAD and the actual diff for unexpected files.
+    - Inspect the staged file list and diff, then inspect rtk git show --stat HEAD after committing for unexpected files.
 
 operations:
   apply:
@@ -43,6 +43,5 @@ operations:
       - Complete validation before handing the change to an independent review pass; report existing failures separately.
   archive:
     guidance:
-      - Archive only after independent review and merge into the target branch.
-      - Synchronize applicable deltas into local specs/kiln/ and archive the local change with the OpenSpec CLI.
+      - After independent review, synchronize applicable deltas into local specs/kiln/ and archive the change before finalizing or merging its pull request, so the main specs and archive move are included in the pull request's merge or squash commit.
       - Keep the local specifications authoritative and remove merged feature branches when appropriate.

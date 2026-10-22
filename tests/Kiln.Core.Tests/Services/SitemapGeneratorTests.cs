@@ -66,6 +66,27 @@ public class SitemapGeneratorTests
     }
 
     [Test]
+    public async Task BuildAsync_UnpaginatedCollectionIndex_IsInSitemapExactlyOnce()
+    {
+        var dir = CreateSiteForSitemap(paginate: false);
+
+        try
+        {
+            var result = await CreateBuilder().BuildAsync(dir);
+            var sitemap = await File.ReadAllTextAsync(Path.Combine(dir, "_site", "sitemap.xml"));
+            const string indexLocation = "<loc>http://localhost:5555/blog/</loc>";
+
+            await Assert.That(result.Success).IsTrue();
+            await Assert.That(File.Exists(Path.Combine(dir, "_site", "blog", "index.html"))).IsTrue();
+            await Assert.That(sitemap.Split(indexLocation).Length - 1).IsEqualTo(1);
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Test]
     public async Task BuildAsync_Sitemap_ExcludesDrafts()
     {
         var dir = CreateSiteForSitemap();
@@ -107,22 +128,23 @@ public class SitemapGeneratorTests
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private static string CreateSiteForSitemap()
+    private static string CreateSiteForSitemap(bool paginate = true)
     {
         var dir = Path.Combine(Path.GetTempPath(), $"kiln-sitemap-{Guid.NewGuid():N}");
         Directory.CreateDirectory(Path.Combine(dir, "content", "posts"));
         Directory.CreateDirectory(Path.Combine(dir, "themes", "default", "layouts"));
         Directory.CreateDirectory(Path.Combine(dir, "themes", "default", "partials"));
 
+        var paginateClause = paginate ? "paginate: 10" : "";
         File.WriteAllText(Path.Combine(dir, "site.yaml"),
-            """
+            $"""
             title: Test Site
             baseUrl: http://localhost:5555
             collections:
               posts:
                 directory: content/posts
                 permalink: /blog/:slug/
-                paginate: 10
+                {paginateClause}
             """);
 
         File.WriteAllText(Path.Combine(dir, "content", "posts", "hello-world.md"),

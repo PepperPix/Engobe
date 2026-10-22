@@ -1,6 +1,7 @@
 namespace Kiln.Services;
 
 using System.Collections.ObjectModel;
+using System.Globalization;
 using Kiln.Models;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
@@ -147,13 +148,28 @@ public sealed class SiteConfigLoader : ISiteConfigLoader
             Permalink = dto.Permalink ?? "/:slug/",
             Sort = dto.Sort ?? "none",
             Feed = dto.Feed,
-            Paginate = dto.Paginate,
+            Paginate = MapPaginate(dto.Paginate),
             Layout = dto.Layout ?? "default",
             TeaserWords = dto.TeaserWords ?? ContentGroup.DefaultTeaserWords,
             Taxonomies = taxonomies,
             References = dto.References ?? [],
             Plugins = dto.Plugins ?? [],
             Extra = dto.Extra ?? []
+        };
+    }
+
+    private static int? MapPaginate(object? value)
+    {
+        return value switch
+        {
+            null => null,
+            false => null,
+            true => throw new InvalidOperationException("Collection 'paginate' must be false or an integer."),
+            int number => number,
+            long number when number is >= int.MinValue and <= int.MaxValue => (int)number,
+            string text when string.Equals(text, "false", StringComparison.OrdinalIgnoreCase) => null,
+            string text when int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number) => number,
+            _ => throw new InvalidOperationException("Collection 'paginate' must be false or an integer.")
         };
     }
 
@@ -271,7 +287,7 @@ public sealed class SiteConfigLoader : ISiteConfigLoader
         public string? Permalink { get; set; }
         public string? Sort { get; set; }
         public bool Feed { get; set; }
-        public int? Paginate { get; set; }
+        public object? Paginate { get; set; }
         public string? Layout { get; set; }
         public int? TeaserWords { get; set; }
         public List<string>? Taxonomies { get; set; }

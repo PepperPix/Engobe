@@ -136,7 +136,7 @@ internal sealed class AssetUrlResolver
                 && TryStripPrefix(path, EffectivePath(EffectiveBase), out var effectiveRemainder)
                 && TryNormalizeRemainder(effectiveRemainder, out key);
         }
-        if (TryStripPrefix(path, EffectivePath(EffectiveBase), out var remainder)
+        if ((!IsAbsolute && TryStripPrefix(path, EffectivePath(EffectiveBase), out var remainder))
             || TryStripPrefix(path, CanonicalPrefix, out remainder))
             return TryNormalizeRemainder(remainder, out key);
         return false;

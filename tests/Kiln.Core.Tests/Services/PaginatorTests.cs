@@ -93,7 +93,7 @@ public class PaginatorTests
     }
 
     [Test]
-    public async Task BuildAsync_CollectionNoPaginate_NoIndexPage()
+    public async Task BuildAsync_CollectionNoPaginate_WithIndexTemplate_RendersAllItemsOnOnePage()
     {
         var dir = CreateSiteWithManyPosts(5, pageSize: 0);
 
@@ -101,6 +101,55 @@ public class PaginatorTests
         {
             var builder = CreateBuilder();
             var result = await builder.BuildAsync(dir);
+
+            await Assert.That(result.Success).IsTrue();
+            var indexPath = Path.Combine(dir, "_site", "blog", "index.html");
+            await Assert.That(File.Exists(indexPath)).IsTrue();
+            await Assert.That(File.Exists(Path.Combine(dir, "_site", "blog", "page", "2", "index.html"))).IsFalse();
+
+            var html = await File.ReadAllTextAsync(indexPath);
+            await Assert.That(html).Contains("page=1");
+            await Assert.That(html).Contains("Post 1");
+            await Assert.That(html).Contains("Post 5");
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Test]
+    public async Task BuildAsync_CollectionNoPaginate_WithoutCollectionTemplate_NoIndexPage()
+    {
+        var dir = CreateSiteWithManyPosts(5, pageSize: 0, collectionIndexLayout: null);
+
+        try
+        {
+            var result = await CreateBuilder().BuildAsync(dir);
+
+            await Assert.That(result.Success).IsTrue();
+            await Assert.That(File.Exists(Path.Combine(dir, "_site", "blog", "index.html"))).IsFalse();
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Test]
+    [Arguments("index.html")]
+    [Arguments("default.html")]
+    public async Task BuildAsync_CollectionNoPaginate_GenericLayoutIsNotOptIn(string genericLayout)
+    {
+        var dir = CreateSiteWithManyPosts(
+            5,
+            pageSize: 0,
+            collectionIndexLayout: null,
+            genericIndexLayout: genericLayout);
+
+        try
+        {
+            var result = await CreateBuilder().BuildAsync(dir);
 
             await Assert.That(result.Success).IsTrue();
             await Assert.That(File.Exists(Path.Combine(dir, "_site", "blog", "index.html"))).IsFalse();
@@ -113,7 +162,11 @@ public class PaginatorTests
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private static string CreateSiteWithManyPosts(int count, int pageSize)
+    private static string CreateSiteWithManyPosts(
+        int count,
+        int pageSize,
+        string? collectionIndexLayout = "posts-index.html",
+        string? genericIndexLayout = null)
     {
         var dir = Path.Combine(Path.GetTempPath(), $"kiln-pag-{Guid.NewGuid():N}");
         Directory.CreateDirectory(Path.Combine(dir, "content", "posts"));
@@ -151,11 +204,14 @@ public class PaginatorTests
         File.WriteAllText(Path.Combine(dir, "themes", "default", "layouts", "404.html"),
             "<html>Not Found</html>");
 
-        File.WriteAllText(Path.Combine(dir, "themes", "default", "layouts", "posts-index.html"),
-            """
+        const string indexTemplate = """
             page={{ paginator.page }} next_url={{ paginator.next_url }} prev_url={{ paginator.prev_url }}
             {{ for item in paginator.items }}<a href="{{ item.url }}">{{ item.title }}</a>{{ end }}
-            """);
+            """;
+        if (collectionIndexLayout is not null)
+            File.WriteAllText(Path.Combine(dir, "themes", "default", "layouts", collectionIndexLayout), indexTemplate);
+        if (genericIndexLayout is not null && genericIndexLayout != "default.html")
+            File.WriteAllText(Path.Combine(dir, "themes", "default", "layouts", genericIndexLayout), indexTemplate);
 
         return dir;
     }

@@ -79,7 +79,7 @@ public sealed class SiteBuilder(
         var sharedRenderContext = SharedRenderContext.BuildForBuild(config, allTaxonomyTerms, navTree, assetUrls);
 
         // Collect all virtual page URLs for collision checking
-        var virtualUrls = VirtualPageCatalog.CollectVirtualUrls(config, allTaxonomyTerms, includeDrafts);
+        var virtualUrls = VirtualPageCatalog.CollectVirtualUrls(config, allTaxonomyTerms, includeDrafts, themePath);
 
         // Permalink collision check: content items + virtual pages
         CheckPermalinkCollisions(allItems, virtualUrls, errors);
@@ -118,7 +118,7 @@ public sealed class SiteBuilder(
         var (rendered, skippedDrafts) = await RenderContentItemsAsync(
             allItems, includeDrafts, render, warnings, progress, errors, ct).ConfigureAwait(false);
 
-        // Render collection index pages (for collections with Paginate > 0)
+        // Render collection index pages
         rendered += await RenderCollectionIndexesAsync(includeDrafts, render, errors, ct).ConfigureAwait(false);
 
         // Render taxonomy term and overview pages
@@ -131,7 +131,7 @@ public sealed class SiteBuilder(
         _assetCopier.Copy(allItems, projectPath, environment, warnings, render);
 
         // Generate sitemap.xml, Atom feeds, robots.txt
-        await WriteFeedsAndMetaAsync(config, allItems, allTaxonomyTerms, includeDrafts, outputDir, generatedFiles, ct).ConfigureAwait(false);
+        await WriteFeedsAndMetaAsync(render, allItems, allTaxonomyTerms, includeDrafts, ct).ConfigureAwait(false);
 
         // Finalize public asset URLs in both modes; production also minifies, fingerprints, and checks.
         var tally = new BuildTally(allItems.Count, rendered, skippedDrafts, stopwatch.Elapsed);
@@ -203,7 +203,7 @@ public sealed class SiteBuilder(
         {
             var promoted = config.Collections[homeCollectionName];
             promoted.IndexUrlOverride = new Uri("/", UriKind.Relative);
-            if (promoted.Paginate is null)
+            if (promoted.Paginate is not > 0)
                 errors.Add($"home.collection requires 'paginate' on collection '{homeCollectionName}'.");
         }
 
@@ -405,14 +405,16 @@ public sealed class SiteBuilder(
 
         foreach (var collection in render.Config.Collections.Values)
         {
-            if (!(collection.Paginate > 0)) continue;
+            var isPaginated = collection.Paginate is > 0;
+            if (!isPaginated && !TemplateRenderer.HasCollectionIndexLayout(render.ThemePath, collection.Name)) continue;
 
             var nonDraftItems = collection.Items
                 .Where(i => !i.Draft || includeDrafts)
                 .ToList();
             if (nonDraftItems.Count == 0) continue;
 
-            var paginators = VirtualPageCatalog.BuildPaginators(nonDraftItems, collection.Paginate!.Value, collection.IndexUrl.OriginalString, render.Config.BasePath);
+            var pageSize = isPaginated ? collection.Paginate!.Value : nonDraftItems.Count;
+            var paginators = VirtualPageCatalog.BuildPaginators(nonDraftItems, pageSize, collection.IndexUrl.OriginalString, render.Config.BasePath);
             foreach (var paginator in paginators)
             {
                 ct.ThrowIfCancellationRequested();
@@ -529,17 +531,17 @@ public sealed class SiteBuilder(
     }
 
     private static async Task WriteFeedsAndMetaAsync(
-        SiteConfiguration config,
+        RenderPassContext render,
         List<ContentItem> allItems,
         Dictionary<string, IReadOnlyList<TaxonomyTerm>> allTaxonomyTerms,
         bool includeDrafts,
-        string outputDir,
-        HashSet<string>? generatedFiles,
         CancellationToken ct)
     {
+        var config = render.Config;
+
         // Generate sitemap.xml
-        var sitemapContent = SitemapGenerator.Generate(config, allItems, allTaxonomyTerms, includeDrafts);
-        await BuildOutputFiles.WriteOutputTextAsync(Path.Combine(outputDir, "sitemap.xml"), sitemapContent, generatedFiles, ct, Encoding.UTF8).ConfigureAwait(false);
+        var sitemapContent = SitemapGenerator.Generate(config, allItems, allTaxonomyTerms, includeDrafts, render.ThemePath);
+        await BuildOutputFiles.WriteOutputTextAsync(Path.Combine(render.OutputDir, "sitemap.xml"), sitemapContent, render.GeneratedFiles, ct, Encoding.UTF8).ConfigureAwait(false);
 
         // Generate Atom feeds for collections with feed: true
         foreach (var collection in config.Collections.Values)
@@ -548,15 +550,15 @@ public sealed class SiteBuilder(
             var feedContent = FeedGenerator.GenerateAtom(collection, collection.Items, config);
             var indexRelPath = collection.IndexUrl.OriginalString.Trim('/');
             var feedDir = string.IsNullOrEmpty(indexRelPath)
-                ? outputDir
-                : Path.Combine(outputDir, indexRelPath);
+                ? render.OutputDir
+                : Path.Combine(render.OutputDir, indexRelPath);
             Directory.CreateDirectory(feedDir);
-            await BuildOutputFiles.WriteOutputTextAsync(Path.Combine(feedDir, "feed.xml"), feedContent, generatedFiles, ct, Encoding.UTF8).ConfigureAwait(false);
+            await BuildOutputFiles.WriteOutputTextAsync(Path.Combine(feedDir, "feed.xml"), feedContent, render.GeneratedFiles, ct, Encoding.UTF8).ConfigureAwait(false);
         }
 
         // Generate robots.txt
         var robotsTxt = $"User-agent: *\nAllow: /\n\nSitemap: {config.BaseUrl.ToString().TrimEnd('/')}/sitemap.xml\n";
-        await BuildOutputFiles.WriteOutputTextAsync(Path.Combine(outputDir, "robots.txt"), robotsTxt, generatedFiles, ct, Encoding.UTF8).ConfigureAwait(false);
+        await BuildOutputFiles.WriteOutputTextAsync(Path.Combine(render.OutputDir, "robots.txt"), robotsTxt, render.GeneratedFiles, ct, Encoding.UTF8).ConfigureAwait(false);
     }
 
     /// <summary>

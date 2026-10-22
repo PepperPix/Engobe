@@ -71,6 +71,12 @@ public sealed class TemplateRenderer : ITemplateRenderer
         });
     }
 
+    internal static bool HasCollectionIndexLayout(string themePath, string collectionName)
+    {
+        var layoutPath = Path.Combine(themePath, "layouts", $"{collectionName}-index.html");
+        return File.Exists(layoutPath);
+    }
+
     public string RenderTaxonomyTerm(
         TaxonomyTerm term,
         Paginator paginator,

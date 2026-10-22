@@ -755,6 +755,9 @@ public class AssetPipelineIntegrationTests
                 await SetAssetPrefixAsync(foreignCdnSite, "https://cdn.example.com/blog/");
                 var foreignCdn = await builder.BuildAsync(foreignCdnSite, false, BuildEnvironment.Production, CancellationToken.None);
                 await Assert.That(foreignCdn.Success).IsTrue();
+                var foreignCdnIndex = await File.ReadAllTextAsync(Path.Combine(foreignCdnSite, "_site", "blog", "index.html"));
+                await Assert.That(foreignCdnIndex).Contains("/blog/hello-world/");
+                await Assert.That(foreignCdnIndex).DoesNotContain("https://cdn.example.com/blog/hello-world");
 
                 await SetAssetPrefixAsync(liveReloadSite, "/__kiln/livereload/");
                 var liveReloadCollision = await builder.BuildAsync(liveReloadSite, false, BuildEnvironment.Production, CancellationToken.None);
