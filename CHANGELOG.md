@@ -1,3 +1,10 @@
+# [2.0.0-beta.7](https://github.com/PepperPix/Kiln/compare/v2.0.0-beta.6...v2.0.0-beta.7) (2026-10-22)
+
+
+### Bug Fixes
+
+* address beta release review feedback ([37a0952](https://github.com/PepperPix/Kiln/commit/37a09522731a3c43a9169b02f99b43355229692d))
+
 # [2.0.0-beta.6](https://github.com/PepperPix/Kiln/compare/v2.0.0-beta.5...v2.0.0-beta.6) (2026-10-22)
 
 

@@ -1,8 +1,8 @@
 <Project>
   <PropertyGroup>
-    <Version>2.0.0-beta.6</Version>
-    <InformationalVersion>2.0.0-beta.6</InformationalVersion>
-    <RepositoryCommit>373dfae588a5233e3886619252f130f08f133433</RepositoryCommit>
+    <Version>2.0.0-beta.7</Version>
+    <InformationalVersion>2.0.0-beta.7</InformationalVersion>
+    <RepositoryCommit>37a09522731a3c43a9169b02f99b43355229692d</RepositoryCommit>
     <Authors>Marcel Kummerow</Authors>
     <Company>CScharf</Company>
     <Product>Kiln</Product>
