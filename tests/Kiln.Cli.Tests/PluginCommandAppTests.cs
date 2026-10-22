@@ -2,6 +2,7 @@ namespace Kiln.Cli.Tests;
 
 using Kiln.Cli.Commands;
 using Kiln.Cli.Tests.Fakes;
+using Kiln.Models;
 using Kiln.Services;
 using Kiln.Tests;
 using System.Security.Cryptography;
@@ -13,17 +14,19 @@ using Spectre.Console.Testing;
 public class PluginCommandAppTests
 {
     [Test]
-    [Arguments(false, "match")]
-    [Arguments(true, "match")]
-    [Arguments(false, "missing")]
-    [Arguments(true, "missing")]
-    [Arguments(false, "mismatch")]
-    [Arguments(true, "mismatch")]
-    [Arguments(false, "offline-match")]
-    [Arguments(true, "offline-match")]
-    [Arguments(false, "offline-missing")]
-    [Arguments(true, "offline-missing")]
-    public async Task PluginCommands_EnforcePackageHashVerification_WithRealV3Feed(bool update, string mode)
+    [Arguments(false, "match", false)]
+    [Arguments(true, "match", false)]
+    [Arguments(false, "missing", false)]
+    [Arguments(true, "missing", false)]
+    [Arguments(false, "mismatch", false)]
+    [Arguments(true, "mismatch", false)]
+    [Arguments(false, "offline-match", false)]
+    [Arguments(true, "offline-match", false)]
+    [Arguments(false, "offline-missing", false)]
+    [Arguments(true, "offline-missing", false)]
+    [Arguments(false, "missing", true)]
+    [Arguments(true, "missing", true)]
+    public async Task PluginCommands_EnforcePackageHashVerification_WithRealV3Feed(bool update, string mode, bool consent)
     {
         await using var feed = new FakeNuGetV3Feed();
         var hash = mode == "mismatch" ? Convert.ToBase64String(new byte[64]) : "match";
@@ -53,14 +56,21 @@ public class PluginCommandAppTests
                 await lockFile.SetAsync(project, "verified", new PluginLockEntry("Kiln.Plugin.Verified", "1.0.0", "nuget")
                 {
                     ContentHash = PluginContentHasher.ComputeDirectoryHash(installed),
+                    Trust = PluginTrustLevel.FirstParty,
                 });
             }
             var before = SnapshotFileHashes(project);
             var (app, console) = CreateApp(client, lockFile);
             console.Profile.Width = 1000;
-            var result = await app.RunAsync(update
-                ? ["plugin", "update", "verified", project, "--yes"]
-                : ["plugin", "add", "Kiln.Plugin.Verified", project, "--version", "1.2.3", "--yes"]);
+            console.Profile.Capabilities.Interactive = consent;
+            if (consent)
+                console.Input.PushTextWithEnter("y");
+            string[] arguments = update
+                ? ["plugin", "update", "verified", project]
+                : ["plugin", "add", "Kiln.Plugin.Verified", project, "--version", "1.2.3"];
+            if (!consent)
+                arguments = [..arguments, "--yes"];
+            var result = await app.RunAsync(arguments);
 
             var failure = mode is "mismatch" or "offline-missing";
             await Assert.That(result.ExitCode).IsEqualTo(failure ? 1 : 0);
@@ -82,7 +92,17 @@ public class PluginCommandAppTests
                 await Assert.That(console.Output).Contains("Kiln.Plugin.Verified 1.2.3");
             }
             if (mode == "missing")
+            {
                 await Assert.That(console.Output).Contains("without package hash verification");
+                await Assert.That(console.Output.Split("without package hash verification").Length).IsEqualTo(2);
+                if (consent)
+                {
+                    var prompt = update ? "Update 'verified'" : "Install community plugin";
+                    var warningPosition = console.Output.IndexOf("WARN:", StringComparison.Ordinal);
+                    var promptPosition = console.Output.IndexOf(prompt, StringComparison.Ordinal);
+                    await Assert.That(promptPosition).IsGreaterThan(warningPosition);
+                }
+            }
         }
         finally
         {

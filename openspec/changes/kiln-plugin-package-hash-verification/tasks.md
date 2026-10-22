@@ -19,4 +19,4 @@
 - [x] 3.2 Run the full `dotnet test` suite (without `rtk`) in `PepperPix/Kiln` and confirm all tests pass.
 - [x] 3.3 Run `jb inspectcode Kiln.slnx -e=WARNING -f=Text` with zero findings.
 - [x] 3.4 Run add/update integration against the fake V3 feed: hash match installs, online hash miss warns and installs, mismatch aborts without changes; offline hash hit installs and offline hash miss warns and aborts without changes.
-- [ ] 3.5 Inspect `rtk git show --stat HEAD`; only expected Kiln code, test, and product documentation files may be included.
+- [x] 3.5 Inspect `rtk git show --stat HEAD`; only expected Kiln code, test, and product documentation files may be included.

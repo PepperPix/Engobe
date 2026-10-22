@@ -121,7 +121,9 @@ public class NuGetPluginClientTests
     }
 
     [Test]
-    public async Task AddAsync_ReportsMissingHashBeforeOpeningTheArchive()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task PackageInspection_ReportsMissingHashBeforeOpeningTheArchive(bool info)
     {
         await using var feed = new FakeNuGetV3Feed();
         feed.SetPackageBytes("Kiln.Plugin.Verified", "1.2.3", [1, 2, 3], hash: null);
@@ -130,7 +132,10 @@ public class NuGetPluginClientTests
         string? warning = null;
         var options = new PluginInstallOptions { ReportPackageVerificationWarning = value => warning = value };
 
-        await Assert.ThrowsAsync<InvalidDataException>(() => client.AddAsync("Kiln.Plugin.Verified", "1.2.3", root, options));
+        if (info)
+            await Assert.ThrowsAsync<InvalidDataException>(() => client.GetInfoAsync("Kiln.Plugin.Verified", "1.2.3", value => warning = value));
+        else
+            await Assert.ThrowsAsync<InvalidDataException>(() => client.AddAsync("Kiln.Plugin.Verified", "1.2.3", root, options));
 
         await Assert.That(warning).Contains("without package hash verification");
         await Assert.That(Directory.Exists(root)).IsFalse();

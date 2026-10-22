@@ -41,12 +41,13 @@ public sealed class PluginAddCommand(
         console.MarkupLine("[yellow]IMPORTANT:[/] This plugin can inject arbitrary HTML/JavaScript into pages. Install only from a trustworthy source.");
 
         var version = settings.Version;
+        var verificationWarningReported = false;
         if (!settings.Yes)
         {
             PluginPackageInfo info;
             try
             {
-                info = await nuGetPluginClient.GetInfoAsync(settings.PackageId, settings.Version, cancellationToken).ConfigureAwait(false);
+                info = await nuGetPluginClient.GetInfoAsync(settings.PackageId, settings.Version, ReportVerificationWarning, cancellationToken).ConfigureAwait(false);
             }
             catch (InvalidOperationException ex)
             {
@@ -63,18 +64,13 @@ public sealed class PluginAddCommand(
         }
 
         PluginPackageInstallResult installResult;
-        var verificationWarningReported = false;
         try
         {
             var options = new PluginInstallOptions
             {
                 Force = settings.Force,
                 ExistingLockEntries = await pluginLockFile.ReadAsync(projectPath, cancellationToken).ConfigureAwait(false),
-                ReportPackageVerificationWarning = message =>
-                {
-                    console.MarkupLine($"[yellow]WARN:[/] {Markup.Escape(message)}");
-                    verificationWarningReported = true;
-                },
+                ReportPackageVerificationWarning = ReportVerificationWarning,
             };
             installResult = await nuGetPluginClient.AddAsync(settings.PackageId, version, projectPath, options, cancellationToken).ConfigureAwait(false);
         }
@@ -103,6 +99,13 @@ public sealed class PluginAddCommand(
         console.MarkupLine($"[dim]Trust level: {PluginTrustDisplay.Label(installResult.Trust)}[/]");
         console.MarkupLine("[dim]Activate it in site.yaml under the relevant collection/plugins section.[/]");
         return 0;
+
+        void ReportVerificationWarning(string message)
+        {
+            if (!verificationWarningReported)
+                console.MarkupLine($"[yellow]WARN:[/] {Markup.Escape(message)}");
+            verificationWarningReported = true;
+        }
     }
 
     private async Task<bool> ConfirmCommunityInstallAsync(PluginPackageInfo info, CancellationToken cancellationToken)

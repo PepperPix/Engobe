@@ -168,9 +168,17 @@ public sealed class NuGetPluginClient : INuGetPluginClient
         return GetInfoCoreAsync(NormalizePackageId(packageId), version, ct);
     }
 
-    private async Task<PluginPackageInfo> GetInfoCoreAsync(string normalizedPackageId, string? version, CancellationToken ct)
+    public Task<PluginPackageInfo> GetInfoAsync(string packageId, string? version, Action<string> reportPackageVerificationWarning, CancellationToken ct = default)
     {
-        using var package = await PreparePackageAsync(normalizedPackageId, version, ct).ConfigureAwait(false);
+        ArgumentNullException.ThrowIfNull(packageId);
+        ArgumentNullException.ThrowIfNull(reportPackageVerificationWarning);
+        return GetInfoCoreAsync(NormalizePackageId(packageId), version, ct, reportPackageVerificationWarning);
+    }
+
+    private async Task<PluginPackageInfo> GetInfoCoreAsync(
+        string normalizedPackageId, string? version, CancellationToken ct, Action<string>? reportWarning = null)
+    {
+        using var package = await PreparePackageAsync(normalizedPackageId, version, ct, reportWarning).ConfigureAwait(false);
         var feedMetadata = await TryGetFeedMetadataAsync(normalizedPackageId, ct).ConfigureAwait(false);
         var scan = PluginContentInspector.Scan(package.ContentRoot);
         var nuspec = package.Nuspec;
