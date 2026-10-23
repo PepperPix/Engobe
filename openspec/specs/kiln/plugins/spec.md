@@ -29,6 +29,10 @@ Engobe SHALL classify a package as first-party only when its ID starts with `Eng
 - **WHEN** first-party metadata is unavailable
 - **THEN** Engobe treats the package as community.
 
+#### Scenario: Legacy prefix does not grant trust
+- **WHEN** a package with an Engobe ecosystem tag uses the old `Kiln.Plugin.` prefix
+- **THEN** Engobe does not classify it as first-party.
+
 ### Requirement: Plugin Information before Installation
 Engobe SHALL provide `engobe plugin info <package-id> [--version <version>]` to display package information without installation.
 
@@ -60,11 +64,15 @@ Engobe SHALL run `engobe plugin add <package-id> [--version <version>] [--force]
 - **THEN** Engobe copies the plugin content to `plugins/<name>` and does not automatically enable it in `site.yaml`.
 
 ### Requirement: Plugin Installation Lock
-Engobe SHALL record NuGet installations in `.engobe/plugins.lock.json` with package ID, version, source, trust level, and SHA-256 content hash.
+Engobe SHALL record NuGet installations in `.engobe/plugins.lock.json` with package ID, version, source, trust level, and SHA-256 content hash. The default nuget.org source SHALL be recorded as `nuget`; an explicitly selected local feed SHALL be stored as a path relative to the project root, and an explicitly selected remote feed SHALL be stored as its non-secret NuGet v3 service index URL. Existing `nuget` entries SHALL continue to resolve to nuget.org.
 
 #### Scenario: Write a Lock Entry
 - **WHEN** `plugin add` or a successful `plugin update` installs a plugin
 - **THEN** Engobe writes the entry under the plugin name in the lock file.
+
+#### Scenario: Update from the recorded source
+- **WHEN** `plugin update` installs a plugin with a custom source in its lock entry
+- **THEN** Engobe uses that source without falling back to nuget.org.
 
 #### Scenario: Local Content Changes
 - **WHEN** the hash of the installed plugin directory differs from the lock entry
@@ -140,3 +148,22 @@ Engobe MUST clearly warn when an online NuGet source provides no SHA-512 hash fo
 #### Scenario: Hash Status Is Reported at Installation
 - **WHEN** Engobe installs an online package without an available SHA-512 value
 - **THEN** the `engobe plugin add` or `engobe plugin update` output clearly states that installation proceeded without package hash verification.
+
+### Requirement: Explicit Plugin Package Source
+`engobe plugin add` SHALL accept `--source <source>` for a local NuGet folder feed or a NuGet v3 service index URL. Without `--source`, Engobe SHALL use nuget.org. An explicit source SHALL be used exclusively for package lookup, inspection, and installation; Engobe SHALL NOT silently fall back to another source. Source credentials SHALL NOT be embedded in the command value or lock entry.
+
+#### Scenario: Install from a local feed
+- **WHEN** the user runs `engobe plugin add <package-id> --source <local-feed>`
+- **THEN** Engobe installs the package from that feed and records the project-relative feed path in the lock entry.
+
+#### Scenario: Install from a remote feed
+- **WHEN** the user runs `engobe plugin add <package-id> --source <service-index-url>`
+- **THEN** Engobe installs the package from that NuGet v3 source and records its non-secret service index URL in the lock entry.
+
+#### Scenario: Update from a custom source
+- **WHEN** the user updates a plugin whose lock entry contains a custom source
+- **THEN** Engobe uses the recorded source and preserves it in the updated lock entry.
+
+#### Scenario: Local source has no first-party metadata
+- **WHEN** the selected feed does not provide prefix-reservation metadata
+- **THEN** Engobe classifies the package as community and retains the existing confirmation requirement.
