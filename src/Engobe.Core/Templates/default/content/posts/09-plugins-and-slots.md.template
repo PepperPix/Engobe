@@ -1,0 +1,59 @@
+---
+id: {{ID9}}
+title: Plugins and Slots
+date: {{DATE-7}}
+tags:
+  - plugins
+  - extensibility
+  - architecture
+---
+
+Engobe plugins are NuGet packages that add content such as shortcodes, slot templates, and static
+assets. A plugin package must carry the `engobe-plugin` tag and include `content/plugin.yaml`.
+
+## Find and inspect a plugin
+
+Search NuGet for compatible packages, then inspect a package before installing it:
+
+```bash
+engobe plugin search email-protect
+engobe plugin info Engobe.Plugin.EmailProtect
+```
+
+Plugin content can add arbitrary HTML and JavaScript to generated pages. Review package contents
+and trust information before installation. Engobe requires confirmation before installing a
+community package unless `--yes` is explicitly supplied.
+
+## Install and manage plugins
+
+```bash
+engobe plugin add Engobe.Plugin.EmailProtect --version <available-version>
+engobe plugin list
+engobe plugin update email-protect
+engobe plugin remove email-protect
+```
+
+The package manifest identifies the plugin and its declared content features:
+
+```yaml
+name: email-protect
+version: 1.0.0
+description: Protect email addresses from scrapers.
+slots:
+  - body_end
+shortcodes:
+  - email
+```
+
+The package can provide the matching files under `content/slots/`, `content/shortcodes/`, and
+`content/static/`. Engobe installs those files in the project's `plugins/` directory.
+
+## Lock data and local edits
+
+NuGet installations are recorded in `.engobe/plugins.lock.json` with the package ID, version,
+source, trust level, and content hash. The lock lets `engobe plugin update` resolve the installed
+package without guessing. Commit this file with the project.
+
+If you customize installed plugin files, back them up before reinstalling or updating. `--force`
+can overwrite local changes. Reapply reviewed customizations after installing the package version
+you intend to use.

@@ -56,7 +56,7 @@ jobs:
       - name: InspectCode gate
         run: |
           dotnet tool install -g JetBrains.ReSharper.GlobalTools
-          jb inspectcode Kiln.slnx -e=WARNING -f=Text -o=inspect.txt
+          jb inspectcode Engobe.slnx -e=WARNING -f=Text -o=inspect.txt
           if grep -qE '\.cs:[0-9]+' inspect.txt; then
             echo "::error::InspectCode found issues — release blocked"
             grep -E '\.cs:[0-9]+' inspect.txt

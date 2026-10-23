@@ -77,5 +77,5 @@ jobs:
       - name: InspectCode
         run: |
           dotnet tool install -g JetBrains.ReSharper.GlobalTools
-          jb inspectcode Kiln.slnx -e=WARNING -f=Text -o=inspect.txt
+          jb inspectcode Engobe.slnx -e=WARNING -f=Text -o=inspect.txt
           cat inspect.txt

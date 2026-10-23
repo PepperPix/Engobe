@@ -1,0 +1,162 @@
+---
+id: {{ID10}}
+title: Configuration Deep Dive
+date: {{DATE-8}}
+tags:
+  - configuration
+  - yaml
+  - advanced
+categories:
+  - tutorial
+---
+
+`site.yaml` is the central configuration file for your Engobe site. This post covers all available options.
+
+## Site Metadata
+
+```yaml
+title: My Engobe Site
+description: A blazingly fast static site generator
+baseUrl: https://example.com
+language: en
+theme: default
+```
+
+- `title`: Site name (used in templates)
+- `description`: Meta description tag
+- `baseUrl`: Full URL to your site
+- `language`: Language code (for HTML lang attribute)
+- `theme`: Theme directory name
+
+## Public Asset URLs
+
+`assetPrefix` is the public URL base for Engobe-owned assets. Physical files always remain under `_site/assets/`; the URL path is not an output directory. For example, `https://cdn.example.com/v2/media/` must map at the CDN origin to the contents of `_site/assets/`. Engobe does not upload assets or configure CDN caching.
+
+```yaml
+baseUrl: https://example.org/docs/
+assetPrefix: /media/
+```
+
+Use `asset_url('css/site.css')`, `plugin_asset_url('search', 'js/index.js')`, and `page_asset_url('hero.jpg')` in themes. A root-relative prefix receives the base path once, while an absolute CDN prefix keeps its own origin and path. A `--base-url` override changes local asset URLs and the site origin used for feeds, not an absolute CDN base.
+
+**BREAKING template behavior:** `site.asset_prefix` now exposes the effective public base, including the base path and exactly one trailing slash. A theme that previously used `site.base_path + site.asset_prefix` must remove that extra composition. `assetPrefix` is camelCase; there is no `asset_prefix` configuration alias.
+
+Production projects owned `src`, `href`, `srcset`, and `poster` attributes, CSS `url()` and both `@import` forms, and the HTML content of Atom feeds. Feed asset URLs are absolute. Query strings and fragments are preserved. Inline CSS/scripts, arbitrary example text, and JavaScript imports are not rewritten. Pagefind stays under the site's local `/pagefind/` path; only Engobe's own search script uses the asset prefix.
+
+Fingerprints use final asset bytes, with imported CSS finalized before its importer. A CSS dependency cycle fails a fingerprinted build; resolve the cycle or deliberately set `build.fingerprint: false`. Prefix projection still applies without fingerprints. Production link checking examines local output files offline and does not verify CDN reachability, CORS, or caching; use `build.linkCheck: false` to disable existence checks.
+
+Development replaces an absolute CDN base with local `/assets/`, but preserves a root-relative custom prefix. Restart `engobe serve` after changing the prefix or effective base path. The local asset namespace cannot overlap generated pages, enabled Pagefind routes, or live reload.
+
+## Collections
+
+```yaml
+collections:
+  posts:
+    directory: content/posts
+    permalink: /blog/:slug/
+    sort: date desc
+    paginate: 10
+    feed: true
+    layout: post
+    taxonomies:
+      - tags
+      - categories
+  pages:
+    directory: content/pages
+    permalink: /:slug/
+    sort: weight asc
+    layout: page
+```
+
+- `directory`: Source directory
+- `permalink`: URL pattern (`:slug`, `:date`, `:title`)
+- `sort`: Field and direction (`date desc`, `weight asc`)
+- `paginate`: Items per page (pagination enabled if >0)
+- `feed`: Generate RSS feed?
+- `layout`: Default template name
+- `taxonomies`: Applied taxonomy types
+
+## Taxonomies
+
+```yaml
+taxonomies:
+  tags:
+    permalink: /tags/:slug/
+    paginate: 20
+    layout: taxonomy
+  categories:
+    permalink: /categories/:slug/
+    paginate: 10
+    layout: taxonomy
+```
+
+- `permalink`: URL pattern for taxonomy pages
+- `paginate`: Items per page
+- `layout`: Template for category pages
+
+## Menus
+
+```yaml
+menus:
+  main:
+    - title: Home
+      ref: posts/
+    - title: About
+      ref: pages/about
+    - title: External
+      url: https://example.com
+      external: true
+```
+
+- `title`: Display text
+- `ref`: Link to collection/page
+- `url`: External URL (sets `external: true`)
+
+## Build Options
+
+```yaml
+build:
+  outputDirectory: _site
+  cleanBefore: true
+  minifyHtml: false
+  minifyCss: false
+```
+
+- `outputDirectory`: Where to generate the site
+- `cleanBefore`: Remove old output before build?
+- `minifyHtml`: Compress HTML output?
+- `minifyCss`: Compress CSS files?
+
+## Development
+
+```yaml
+dev:
+  port: 5555
+  watch: true
+  liveReload: true
+```
+
+- `port`: Dev server port
+- `watch`: Watch files for changes?
+- `liveReload`: Auto-refresh browser?
+
+## Advanced
+
+```yaml
+markdown:
+  extensions:
+    - strikethrough
+    - tables
+    - task-lists
+
+feeds:
+  - collection: posts
+    permalink: /feed.xml
+```
+
+- `markdown.extensions`: Enable CommonMark extensions
+- `feeds`: RSS feeds per collection
+
+Full documentation at [Engobe](https://engobe.studio)
+
+Understanding these options gives you full control over your Engobe site!

@@ -1,4 +1,4 @@
-# Contributing to Kiln
+# Contributing to Engobe
 
 Thanks for your interest in contributing. This document covers the conventions and checks a
 change is expected to satisfy before it can be merged.
@@ -58,13 +58,13 @@ split them into separate files rather than introducing new nested types.
 
 ## Public API compatibility
 
-CI runs NuGet package validation for `Kiln.Core` and `Kiln.Abstractions` against the last stable release (the baseline
+CI runs NuGet package validation for `Engobe.Core` and `Engobe.Abstractions` against the last stable release (the baseline
 version in both `.csproj` files). A pull request that breaks the public API fails the pack step.
 
 - Add new members to interfaces as default interface members.
 - Intentional breaks of concrete classes (not part of the supported surface, see "API stability" in the README) go into
-  `src/Kiln.Core/CompatibilitySuppressions.xml` with an explanatory comment.
-- Breaks of the supported surface (`Kiln.Abstractions`, interfaces, `Kiln.Models`, `AddKiln()` / `IKilnBuilder`) require a major version.
+  `src/Engobe.Core/CompatibilitySuppressions.xml` with an explanatory comment.
+- Breaks of the supported surface (`Engobe.Abstractions`, interfaces, `Engobe.Models`, `AddEngobe()` / `IEngobeBuilder`) require a major version.
 - After each stable release, raise `PackageValidationBaselineVersion` in both `.csproj` files to that release and empty the suppressions file.
 
 ## Dependency Lockfiles
