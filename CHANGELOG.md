@@ -1,3 +1,16 @@
+# [2.0.0-beta.8](https://github.com/PepperPix/Engobe/compare/v2.0.0-beta.7...v2.0.0-beta.8) (2026-10-23)
+
+
+### Features
+
+* rebrand engine and cli as engobe ([31ba7c0](https://github.com/PepperPix/Engobe/commit/31ba7c0e2152b2355f2130e74d65637a41af3a0c))
+
+
+### BREAKING CHANGES
+
+* Rename Kiln packages, commands, public APIs and project state to Engobe.
+No legacy aliases or automatic migration are provided.
+
 # [2.0.0-beta.7](https://github.com/PepperPix/Kiln/compare/v2.0.0-beta.6...v2.0.0-beta.7) (2026-10-22)
 
 
