@@ -1,3 +1,10 @@
+# [2.0.0-beta.9](https://github.com/PepperPix/Engobe/compare/v2.0.0-beta.8...v2.0.0-beta.9) (2026-10-23)
+
+
+### Bug Fixes
+
+* exclude native pdbs from tool symbol packages ([f9c1613](https://github.com/PepperPix/Engobe/commit/f9c1613ac5a45e4e54530dcb8747e601432cddc7))
+
 # [2.0.0-beta.8](https://github.com/PepperPix/Engobe/compare/v2.0.0-beta.7...v2.0.0-beta.8) (2026-10-23)
 
 

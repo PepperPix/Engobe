@@ -1,8 +1,8 @@
 <Project>
   <PropertyGroup>
-    <Version>2.0.0-beta.8</Version>
-    <InformationalVersion>2.0.0-beta.8</InformationalVersion>
-    <RepositoryCommit>31ba7c0e2152b2355f2130e74d65637a41af3a0c</RepositoryCommit>
+    <Version>2.0.0-beta.9</Version>
+    <InformationalVersion>2.0.0-beta.9</InformationalVersion>
+    <RepositoryCommit>f9c1613ac5a45e4e54530dcb8747e601432cddc7</RepositoryCommit>
     <Authors>Marcel Kummerow</Authors>
     <Company>CScharf</Company>
     <Product>Engobe</Product>
