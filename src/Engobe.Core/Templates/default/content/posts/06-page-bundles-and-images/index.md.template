@@ -1,0 +1,166 @@
+---
+id: {{ID13}}
+title: Page Bundles and Images
+date: {{DATE-4}}
+tags:
+  - assets
+  - media
+  - organization
+---
+
+**Page Bundles** are directories that group a post with its associated assets (images, documents, etc.). This keeps your content organized and simplifies asset references.
+
+## Traditional Asset Organization
+
+Without page bundles, you might structure assets like this:
+
+```
+content/
+├── posts/
+│   ├── my-post.md
+│   └── another-post.md
+assets/
+└── images/
+    ├── my-post-header.png
+    └── another-post-diagram.svg
+```
+
+This separates content from assets, making it hard to manage.
+
+## Page Bundle Structure
+
+With page bundles:
+
+```
+content/
+└── posts/
+    ├── my-post/
+    │   ├── index.md.template
+    │   ├── header.png
+    │   └── diagram.svg
+    └── another-post/
+        ├── index.md.template
+        └── screenshot.jpg
+```
+
+Each post is a directory with its own content and assets.
+
+Engobe treats a bundle as a leaf: it reads only the bundle's `index.md`. Nested
+Markdown files such as `child/index.md` or `images/README.md` do not create
+additional pages or sections. They are omitted from published assets, while
+other files in those same directories remain assets.
+
+Bundle assets are copied recursively with their relative subdirectories
+preserved. Engobe omits only Markdown files (case-insensitive `.md` extension),
+hidden files or directories (names starting with `.`), and symbolic links.
+For example, `images/README.md` is omitted, but adjacent images in `images/`
+are still copied.
+
+### Nested bundle assets and sections
+
+Directories inside a page bundle are asset folders, not sections. A nested
+`child/index.md` does not create another page; its non-Markdown siblings remain
+assets. By contrast, a directory outside a bundle that has no `index.md` and
+contains Markdown content is discovered as a normal section.
+
+Nested images and downloads keep their paths in the published asset namespace:
+
+![Installation screen](images/screens/install.svg)
+
+[Download sample data](downloads/sample.csv)
+
+The example files are included beside this post.
+
+## Benefits
+
+- **Co-location**: Content and assets live together
+- **Easier management**: No hunt through global asset folders
+- **Better scaling**: Hundreds of posts without losing track
+- **Reproducibility**: Move a post dir, everything moves with it
+- **Versioning**: Assets change with their content
+
+## Referencing Assets
+
+In your Markdown, reference assets by relative path:
+
+```markdown
+![Post header](./header.png)
+
+![Diagram](./diagram.svg)
+
+[Download PDF](./resources.pdf)
+```
+
+When Engobe builds, it:
+1. **Copies** `header.png` to `_site/assets/content/posts/my-post/`
+2. **Updates** the Markdown link to `/assets/content/posts/my-post/header.png`
+3. **Preserves** the file with its original name and format
+
+## Asset URL Structure
+
+Assets are namespaced by location:
+
+- `/assets/content/posts/06-page-bundles-and-images/` — Post bundle assets
+- `/assets/content/pages/about/` — Page bundle assets (if applicable)
+- `/assets/shared/` — Global shared assets
+
+This namespace makes cache-busting and organization predictable.
+
+## Creating a Bundle
+
+1. Create a directory: `content/posts/my-post/`
+2. Move your post content to `index.md.template`
+3. Add images/assets to the same directory
+4. Engobe handles the rest!
+
+```bash
+mkdir -p content/posts/my-new-post
+echo "---
+id: {{ID-new}}
+title: My New Post
+---
+
+# Welcome
+
+![Image](./my-image.png)" > content/posts/my-new-post/index.md.template
+
+cp ~/my-image.png content/posts/my-new-post/
+```
+
+## Advanced Use Cases
+
+### Multiple images in one post
+
+```
+my-post/
+├── index.md.template
+├── diagram-1.svg
+├── diagram-2.svg
+├── screenshots/
+│   ├── ui-before.png
+│   └── ui-after.png
+└── data.json
+```
+
+### Embedding data files
+
+```markdown
+{% include './data.json' %}
+```
+
+### Using images in templates
+
+```liquid
+<img src="{{ page.relative_url }}diagram.png" alt="Architecture">
+```
+
+## Best Practices
+
+- **Organize by type**: `images/`, `data/`, `documents/`
+- **Use descriptive names**: `feature-comparison.svg` not `img1.png`
+- **Compress media**: Reduce file sizes before bundling
+- **Document references**: In Markdown comments, list what assets are included
+
+Page bundles are a powerful way to organize scalable content sites!
+
+See the Engobe Architecture diagram below — this entire post is a page bundle!

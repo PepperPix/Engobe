@@ -1,0 +1,10 @@
+{
+	"version": 1,
+	"isRoot": true,
+	"tools": {
+		"Engobe": {
+			"version": "{{VERSION}}",
+			"commands": ["engobe"]
+		}
+	}
+}

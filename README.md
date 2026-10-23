@@ -1,8 +1,8 @@
-# Kiln
+# Engobe
 
-[![CI](https://github.com/PepperPix/Kiln/actions/workflows/ci.yml/badge.svg)](https://github.com/PepperPix/Kiln/actions/workflows/ci.yml)
+[![CI](https://github.com/PepperPix/Engobe/actions/workflows/ci.yml/badge.svg)](https://github.com/PepperPix/Engobe/actions/workflows/ci.yml)
 
-Kiln is a fast, extensible static site generator for .NET. It is distributed as a .NET global tool and focuses on a collection-based content model, Scriban templates, and CDN-friendly asset namespaces.
+Engobe is a fast, extensible static site generator for .NET. It is distributed as a .NET global tool and focuses on a collection-based content model, Scriban templates, and CDN-friendly asset namespaces.
 
 **Status:** Early development — see the roadmap and tests for current progress.
 
@@ -11,27 +11,30 @@ Kiln is a fast, extensible static site generator for .NET. It is distributed as 
 Install the global tool (once published) and create a site:
 
 ```bash
-dotnet tool install -g Kiln
-kiln new my-site
+dotnet tool install -g Engobe
+engobe new my-site
 ```
+
+New sites pin the creating Engobe package version in `.config/dotnet-tools.json`,
+including its prerelease suffix. Restore that exact version with `dotnet tool restore`.
 
 Build and serve locally:
 
 ```bash
-kiln build
-kiln serve
+engobe build
+engobe serve
 ```
 
 ## Asset URLs and CDN hosting
 
-Kiln always writes site, theme, bundle, and plugin files to `<outputDir>/assets/` (normally `_site/assets/`). `assetPrefix` changes only their public URLs; Kiln does not upload files or configure cache headers. For example:
+Engobe always writes site, theme, bundle, and plugin files to `<outputDir>/assets/` (normally `_site/assets/`). `assetPrefix` changes only their public URLs; Engobe does not upload files or configure cache headers. For example:
 
 ```yaml
 baseUrl: https://example.org/docs/
 assetPrefix: https://cdn.example.com/v2/media/
 ```
 
-The CDN origin must map `https://cdn.example.com/v2/media/` to the **contents** of `_site/assets/`; Kiln does not create `_site/v2/media/`. Root-relative prefixes such as `/media/` receive the site's base path once, while absolute HTTP(S) prefixes retain their own origin and path. A `--base-url` override changes local asset URLs and the site origin used for feeds, but never changes an absolute CDN prefix.
+The CDN origin must map `https://cdn.example.com/v2/media/` to the **contents** of `_site/assets/`; Engobe does not create `_site/v2/media/`. Root-relative prefixes such as `/media/` receive the site's base path once, while absolute HTTP(S) prefixes retain their own origin and path. A `--base-url` override changes local asset URLs and the site origin used for feeds, but never changes an absolute CDN prefix.
 
 Prefixes must not contain credentials, query strings, fragments, traversal segments, or raw or
 percent-encoded backslashes. Production link checking compares URL paths case-sensitively on every
@@ -39,11 +42,11 @@ platform: `Logo.svg` does not match an output file named `logo.svg`.
 
 Use `asset_url`, `plugin_asset_url`, and `page_asset_url` in themes. **BREAKING template change:** `site.asset_prefix` is now the effective public base, including the site base path and one trailing slash. Themes that previously composed `site.base_path + site.asset_prefix` must remove that extra composition; helper-based themes need no change. `site.yaml` uses camelCase `assetPrefix`; `asset_prefix` is not a configuration alias.
 
-Production rewrites owned `src`, `href`, `srcset`, and `poster` attributes, plus CSS `url()` and both `@import` forms. Atom HTML content receives the same projection and absolute asset URLs (CDN origin or site origin for a local prefix). Query strings and fragments are preserved. Inline CSS/scripts, arbitrary example text, and JavaScript imports are not rewritten. Pagefind remains at the site-local `/pagefind/` path under the site's base path; only Kiln's own search script uses the asset prefix.
+Production rewrites owned `src`, `href`, `srcset`, and `poster` attributes, plus CSS `url()` and both `@import` forms. Atom HTML content receives the same projection and absolute asset URLs (CDN origin or site origin for a local prefix). Query strings and fragments are preserved. Inline CSS/scripts, arbitrary example text, and JavaScript imports are not rewritten. Pagefind remains at the site-local `/pagefind/` path under the site's base path; only Engobe's own search script uses the asset prefix.
 
 Fingerprinting hashes final asset bytes; imported CSS is finalized before its importing stylesheet. A CSS dependency cycle is a build error when fingerprinting is enabled; resolve the cycle or set `build.fingerprint: false`. Prefixing still applies when fingerprinting is disabled. Production link checking is offline: it checks owned local output files after rewriting, including CSS and Atom references, and never contacts a CDN. It skips foreign external URLs and does not verify CDN reachability, CORS, or cache behavior. Set `build.linkCheck: false` to disable existence checks.
 
-In development, an absolute CDN prefix falls back to local `/assets/`; a root-relative custom prefix remains local and is served from `assets/`. References already written with the configured CDN base in supported HTML attributes, external CSS, or Atom HTML content also map to local preview URLs; unrelated hosts, ports, and neighboring paths remain unchanged. If the effective asset prefix or site base path changes while `kiln serve` is running, restart the server. Local asset namespaces may not overlap generated pages, Pagefind when enabled, or the live-reload route; choose another prefix if a build reports a collision.
+In development, an absolute CDN prefix falls back to local `/assets/`; a root-relative custom prefix remains local and is served from `assets/`. References already written with the configured CDN base in supported HTML attributes, external CSS, or Atom HTML content also map to local preview URLs; unrelated hosts, ports, and neighboring paths remain unchanged. If the effective asset prefix or site base path changes while `engobe serve` is running, restart the server. Local asset namespaces may not overlap generated pages, Pagefind when enabled, or the live-reload route; choose another prefix if a build reports a collision.
 
 ## Features
 
@@ -61,95 +64,106 @@ In development, an absolute CDN prefix falls back to local `/assets/`; a root-re
 
 ```
 src/
-├── Kiln.Core/    # Engine: content pipeline, templating, builders
-└── Kiln.Cli/     # CLI: commands, dev server, tooling
+├── Engobe.Core/    # Engine: content pipeline, templating, builders
+└── Engobe.Cli/     # CLI: commands, dev server, tooling
 tests/
-├── Kiln.Core.Tests/
-└── Kiln.Cli.Tests/
+├── Engobe.Core.Tests/
+└── Engobe.Cli.Tests/
 ```
 
 ## API stability
 
-The `Kiln.Core` and `Kiln.Abstractions` packages follow semantic versioning for the following supported surface:
+The `Engobe.Core` and `Engobe.Abstractions` packages follow semantic versioning for the following supported surface:
 
-- everything in `Kiln.Abstractions`
+- everything in `Engobe.Abstractions`
 - all interfaces (including `ISiteConfigLoader`)
-- all types in the `Kiln.Models` namespace
-- `AddKiln()` and `IKilnBuilder`
+- all types in the `Engobe.Models` namespace
+- `AddEngobe()` and `IEngobeBuilder`
 
-Concrete classes in `Kiln.Services` (for example `SiteBuilder`, `DevServer`, `NuGetPluginClient`) are public for compatibility
+Concrete classes in `Engobe.Services` (for example `SiteBuilder`, `DevServer`, `NuGetPluginClient`) are public for compatibility
 but are **not** covered by this guarantee; they may change in any release. New members on interfaces are added as default interface members.
 
 ## CLI Reference
 
 Common commands (exact names):
 
-- `kiln new <site-name>` — create a new site scaffold
-- `kiln build` — build the static site (output directory: `_site`)
-- `kiln serve` — start local dev server with live-reload
-- `kiln deploy <target>` — initialize deployment workflows; supported targets: `github-pages`, `azure-swa`
-- `kiln gen docs --openapi <spec> --output <dir>` — generate reference documentation from an OpenAPI spec
-- `kiln gen dotnet-xml --xml <path> --output <dir>` — generate reference documentation from a .NET XML documentation file
-- `kiln search index [path] [--no-download] [--extended] [--output <dir>]` — build a Pagefind search index over the build output
+- `engobe new <site-name>` — create a new site scaffold
+- `engobe build` — build the static site (output directory: `_site`)
+- `engobe serve` — start local dev server with live-reload
+- `engobe deploy <target>` — initialize deployment workflows; supported targets: `github-pages`, `azure-swa`
+- `engobe gen docs --openapi <spec> --output <dir>` — generate reference documentation from an OpenAPI spec
+- `engobe gen dotnet-xml --xml <path> --output <dir>` — generate reference documentation from a .NET XML documentation file
+- `engobe search index [path] [--no-download] [--extended] [--output <dir>]` — build a Pagefind search index over the build output
 
 Examples:
 
 ```bash
-kiln new blog
-kiln build
-kiln serve
+engobe new blog
+engobe build
+engobe serve
 
 # Initialize GitHub Pages deployment workflow in the current project
-kiln deploy github-pages
+engobe deploy github-pages
 
 # Initialize Azure Static Web Apps workflow and staticwebapp.config.json
-kiln deploy azure-swa
+engobe deploy azure-swa
 
 # Generate API reference docs from an OpenAPI spec into content/api
-kiln gen docs --openapi openapi.json --output content/api
+engobe gen docs --openapi openapi.json --output content/api
 
 # Generate API reference docs from a .NET XML documentation file
-kiln gen dotnet-xml --xml bin/Release/net10.0/MyLib.xml --output content/api-dotnet
+engobe gen dotnet-xml --xml bin/Release/net10.0/MyLib.xml --output content/api-dotnet
 
 # Build a search index over the default output directory
-kiln search index
+engobe search index
 ```
 
 Important: the `deploy` command expects a target argument, e.g. `github-pages` or `azure-swa`.
 
+## Shell completion
+
+Engobe responds to the `dotnet-suggest` completion protocol with command, option, and local plugin-name suggestions. To enable completion, install and register Engobe with `dotnet-suggest` as described in the [.NET tab completion guide](https://learn.microsoft.com/dotnet/standard/commandline/how-to-enable-tab-completion). Shell-specific shim and profile setup is managed by the user; Engobe does not install `dotnet-suggest` or modify shell configuration.
+
+For manual migration from Kiln, see [UPGRADING.md](./UPGRADING.md).
+
 ## Plugins find & install
 
-Kiln can discover and install content plugins from NuGet packages marked with the `kiln-plugin` tag.
+Engobe can discover and install content plugins from NuGet packages marked with the `engobe-plugin` tag.
 
 > Security warning: content plugins can inject arbitrary HTML and JavaScript into pages, so install only packages from trusted sources.
 
 ```bash
-# Search public NuGet packages for Kiln plugins (shows the trust level)
-kiln plugin search email-protect
+# Search public NuGet packages for Engobe plugins (shows the trust level)
+engobe plugin search email-protect
 
 # Inspect a package without installing it
-kiln plugin info Kiln.Plugin.EmailProtect
+engobe plugin info Engobe.Plugin.EmailProtect
 
 # Install a plugin into the current project
-kiln plugin add Kiln.Plugin.EmailProtect --version 1.0.0
+engobe plugin add Engobe.Plugin.EmailProtect --version 1.0.0
+
+# Install from a local folder feed (or a NuGet v3 service index URL)
+engobe plugin add Engobe.Plugin.EmailProtect --source ../packages --yes
 
 # Skip the confirmation for community plugins (scripts, CI)
-kiln plugin add Contoso.Widget --yes
+engobe plugin add Contoso.Widget --yes
 
-# Update a plugin that was installed through kiln plugin add
-kiln plugin update email-protect
+# Update a plugin that was installed through engobe plugin add
+engobe plugin update email-protect
 
-# Update all plugins recorded in .kiln/plugins.lock.json
-kiln plugin update --all
+# Update all plugins recorded in .engobe/plugins.lock.json
+engobe plugin update --all
 
 # Remove a plugin folder and its lock entry
-kiln plugin remove email-protect --yes
+engobe plugin remove email-protect --yes
 
 # List local plugins, their installation source and trust level
-kiln plugin list
+engobe plugin list
 ```
 
-Each installed plugin is recorded in `.kiln/plugins.lock.json` with the package ID, installed version, source (`nuget`), trust level and a content hash. This file is intentionally project-local and versioned so `kiln plugin update` can resolve the correct package without guessing names.
+Each installed plugin is recorded in `.engobe/plugins.lock.json` with the package ID, installed version, source (`nuget`), trust level and a content hash. This file is intentionally project-local and versioned so `engobe plugin update` can resolve the correct package without guessing names.
+
+Without `--source`, installation uses nuget.org and records `source: nuget`. An explicit source is used exclusively, without fallback. Local feed paths supplied to `plugin add` are relative to the current directory and are stored relative to the project root; remote feeds are stored as NuGet v3 service index URLs. Updates, including `--all`, reuse each plugin's recorded source. A missing local feed must be restored at its recorded location before updating. Do not put credentials, query parameters, or fragments in source URLs; configure feed credentials through NuGet configuration instead. Local feeds without prefix-reservation metadata are community sources and still require confirmation or `--yes`.
 
 ### Package integrity
 
@@ -161,28 +175,28 @@ The lock file's `contentHash` remains the installed directory's SHA-256 hash, no
 
 ### Trust model
 
-- The `kiln-plugin` tag is required: packages without it are never installed, and there is no override.
-- **First-party** plugins use the `Kiln.Plugin.` package ID prefix, which is reserved on nuget.org. `kiln plugin search` and `kiln plugin info` show a package as first-party only if the ID has the prefix and nuget.org reports the reservation. Without feed metadata (local feed, offline) a package counts as community.
-- **Community** plugins are any other tagged package. `kiln plugin add` shows the package information and asks for confirmation (default: no). Without an interactive console, pass `--yes`.
-- `kiln plugin info` lists publisher, license, slots, shortcodes, file inventory and the external hosts referenced by the plugin's scripts, styles and markup. The host list is a heuristic; URLs that a script builds at runtime are not detected.
-- `kiln plugin update` asks only when the new version references additional external hosts or a first-party plugin has become a community package. `--yes` skips the question.
+- The `engobe-plugin` tag is required: packages without it are never installed, and there is no override.
+- **First-party** plugins use the `Engobe.Plugin.` package ID prefix, which is reserved on nuget.org. `engobe plugin search` and `engobe plugin info` show a package as first-party only if the ID has the prefix and nuget.org reports the reservation. Without feed metadata (local feed, offline) a package counts as community.
+- **Community** plugins are any other tagged package. `engobe plugin add` shows the package information and asks for confirmation (default: no). Without an interactive console, pass `--yes`.
+- `engobe plugin info` lists publisher, license, slots, shortcodes, file inventory and the external hosts referenced by the plugin's scripts, styles and markup. The host list is a heuristic; URLs that a script builds at runtime are not detected.
+- `engobe plugin update` asks only when the new version references additional external hosts or a first-party plugin has become a community package. `--yes` skips the question.
 - An existing plugin directory is only replaced if it is tracked in the lock file and unmodified; use `--force` to overwrite it.
 
 ### Writing a plugin package
 
-- Add the tag `kiln-plugin` to the package's `.nuspec`.
-- Put `plugin.yaml` and all assets under `content/` in the package; ship built assets, Kiln does not run npm or resolve dependencies at install time.
-- The `Kiln.Plugin.` ID prefix is reserved for first-party plugins; choose a different ID for your own package.
+- Add the tag `engobe-plugin` to the package's `.nuspec`.
+- Put `plugin.yaml` and all assets under `content/` in the package; ship built assets, Engobe does not run npm or resolve dependencies at install time.
+- The `Engobe.Plugin.` ID prefix is reserved for first-party plugins; choose a different ID for your own package.
 
 ## Theme & Template Development
 
-Kiln uses Scriban templates for layouts, partials and helpers. Basic concepts:
+Engobe uses Scriban templates for layouts, partials and helpers. Basic concepts:
 
 - Layouts: top-level HTML layout files
 - Partials: reusable template fragments
 - Slots: named insertion points for plugins and themes
 
-The default theme includes an `api` layout (`themes/default/layouts/api.html`) and dedicated stylesheet (`themes/default/static/css/api.css`) designed for reference documentation. It features a sticky sidebar with collapsible namespaces, breadcrumbs, and badges for type kinds and package versions. When creating a site with `kiln new`, theme files are copied into the project directory; existing projects can copy `api.html` and `api.css` manually.
+The default theme includes an `api` layout (`themes/default/layouts/api.html`) and dedicated stylesheet (`themes/default/static/css/api.css`) designed for reference documentation. It features a sticky sidebar with collapsible namespaces, breadcrumbs, and badges for type kinds and package versions. When creating a site with `engobe new`, theme files are copied into the project directory; existing projects can copy `api.html` and `api.css` manually.
 
 Refer to `templates/default` in the project for a minimal theme layout and examples.
 
@@ -250,7 +264,7 @@ UUID references survive target file renames and URL changes. IDs must resolve un
 the collection. The override replaces the direct directory parent; unused sections disappear,
 while other pages keep their structure. Siblings remain sorted by ascending weight, then title.
 Unknown, unpublished, cross-collection, ambiguous, or cyclic references fail the build before
-rendering, with the source file and invalid value in the error. `kiln serve` reports the same
+rendering, with the source file and invalid value in the error. `engobe serve` reports the same
 error during its full rebuilds.
 
 Front matter can also set `noIndex: true` on individual pages to keep them out of the generated
@@ -260,11 +274,11 @@ no-index signal without creating a route-specific `Disallow` entry.
 
 ## Reference Documentation Generation
 
-Kiln can generate reference documentation content from two sources:
+Engobe can generate reference documentation content from two sources:
 
-- **OpenAPI specs** (`kiln gen docs --openapi <spec> --output <dir>`) — generates one content file
+- **OpenAPI specs** (`engobe gen docs --openapi <spec> --output <dir>`) — generates one content file
   per endpoint/operation.
-- **.NET XML documentation** (`kiln gen dotnet-xml --xml <path> --output <dir>`) — generates one
+- **.NET XML documentation** (`engobe gen dotnet-xml --xml <path> --output <dir>`) — generates one
   content file per documented type/member from a project built with
   `<GenerateDocumentationFile>true</GenerateDocumentationFile>`.
 
@@ -273,15 +287,15 @@ Both adapters share a three-tier ownership model for generated content files:
 1. Generated files are written with `generated: true` and a `source_hash` in their frontmatter.
 2. A file with `generated: false` is treated as **adopted** — it is never touched again by
    subsequent generation runs, even if the source spec/XML changes.
-3. If a generated file was edited outside of Kiln (its content no longer matches `source_hash`) and
-   the source changed again, Kiln does not overwrite it — it writes `<file>.md.regenerated` next to
+3. If a generated file was edited outside of Engobe (its content no longer matches `source_hash`) and
+   the source changed again, Engobe does not overwrite it — it writes `<file>.md.regenerated` next to
    it instead, so no manual edits are lost.
 
 ```bash
-kiln gen docs --openapi openapi.json --output content/api
-kiln gen dotnet-xml --xml bin/Release/net10.0/MyLib.xml --output content/api-dotnet
-kiln gen dotnet-xml --xml bin/Release/net10.0/MyLib.xml --assembly bin/Release/net10.0/MyLib.dll --output content/api-dotnet
-kiln gen dotnet-xml --xml bin/Release/net10.0/MyLib.xml --assembly bin/Release/net10.0/MyLib.dll --package-version 1.0.0 --output content/api-dotnet
+engobe gen docs --openapi openapi.json --output content/api
+engobe gen dotnet-xml --xml bin/Release/net10.0/MyLib.xml --output content/api-dotnet
+engobe gen dotnet-xml --xml bin/Release/net10.0/MyLib.xml --assembly bin/Release/net10.0/MyLib.dll --output content/api-dotnet
+engobe gen dotnet-xml --xml bin/Release/net10.0/MyLib.xml --assembly bin/Release/net10.0/MyLib.dll --package-version 1.0.0 --output content/api-dotnet
 ```
 
 The compiler's XML file also contains comments of `internal` and `private` members. Pass
@@ -312,7 +326,7 @@ menus:
 
 ## Search
 
-Kiln integrates [Pagefind](https://pagefind.app) for static full-text search.
+Engobe integrates [Pagefind](https://pagefind.app) for static full-text search.
 
 Enable it in `site.yaml`:
 
@@ -323,50 +337,50 @@ search:
   binaryPath: null   # explicit path to a Pagefind binary (relative to the project directory)
 ```
 
-Build the index after `kiln build`:
+Build the index after `engobe build`:
 
 ```bash
-kiln build
-kiln search index
+engobe build
+engobe search index
 ```
 
 The Pagefind binary is resolved in this order:
 
-1. `KILN_PAGEFIND_PATH` environment variable, if set and the file exists. This is an explicit
+1. `ENGOBE_PAGEFIND_PATH` environment variable, if set and the file exists. This is an explicit
    choice and the binary is never version-checked.
 2. The `search.binaryPath` setting from `site.yaml`. Relative paths are resolved against the project
-   directory (the folder containing `site.yaml`). Like `KILN_PAGEFIND_PATH`, this is an explicit
-   choice: the binary is not version-checked, and a path that does not exist is an error (Kiln does
+   directory (the folder containing `site.yaml`). Like `ENGOBE_PAGEFIND_PATH`, this is an explicit
+   choice: the binary is not version-checked, and a path that does not exist is an error (Engobe does
    not fall back to `PATH`, the cache or a download).
 3. The system `PATH`. A binary found there is only used if `--version` reports Pagefind 1.5.0 or
    newer; otherwise it is skipped, and with `--no-download` the reason is included in the error if nothing else is found.
-4. The local cache at `~/.kiln/tools/pagefind/<version>/` (override the cache root with
-   `KILN_PAGEFIND_CACHE_DIR`).
-5. Automatic download of the Pagefind version pinned by Kiln (currently 1.5.2) from the Pagefind
+4. The local cache at `~/.engobe/tools/pagefind/<version>/` (override the cache root with
+`ENGOBE_PAGEFIND_CACHE_DIR`).
+5. Automatic download of the Pagefind version pinned by Engobe (currently 1.5.2) from the Pagefind
    GitHub releases, with SHA256 verification (use `--no-download` to disable this and fail
    instead). The archive is extracted to a temporary file and moved into the cache only when
    complete.
 
-Binaries from `KILN_PAGEFIND_PATH` or `search.binaryPath` are not version-checked, so make sure
-they are Pagefind 1.5.0 or newer, the minimum version Kiln requires.
+Binaries from `ENGOBE_PAGEFIND_PATH` or `search.binaryPath` are not version-checked, so make sure
+they are Pagefind 1.5.0 or newer, the minimum version Engobe requires.
 
 ### Trust model
 
-A downloaded binary comes from the official Pagefind GitHub release of the version pinned by Kiln.
+A downloaded binary comes from the official Pagefind GitHub release of the version pinned by Engobe.
 The SHA256 checksum is fetched from the same release as the archive, so it protects against
 corrupted or truncated downloads, but not against a compromised release or GitHub account. If you
 cannot accept that, pass `--no-download` and provide the binary yourself, either through
-`KILN_PAGEFIND_PATH` or `search.binaryPath` (you are responsible for verifying it) or by installing
+`ENGOBE_PAGEFIND_PATH` or `search.binaryPath` (you are responsible for verifying it) or by installing
 it through a channel you trust.
 
-Search is disabled by default and `kiln serve` never triggers indexing or a download. The default
+Search is disabled by default and `engobe serve` never triggers indexing or a download. The default
 theme ships with an opt-in search UI that is self-guarded and requires no extra setup once search is
 enabled and indexed.
 
 Search indexing runs after the Core build. With search enabled, production link checking reports
 and defers missing `/pagefind/pagefind.js` and `/pagefind/pagefind-ui.css` entrypoints under the
 effective site base path. Other missing files remain errors. Run search indexing before publishing;
-`kiln build` does this automatically unless `--no-search` is passed. With search disabled, neither
+`engobe build` does this automatically unless `--no-search` is passed. With search disabled, neither
 entrypoint is exempt from checking.
 
 ## Nested Content Sections
@@ -381,17 +395,17 @@ URLs of nested content mirror the directory path, e.g. `guides/advanced/install.
 
 ## CI / CD Deployment Recipes
 
-The Kiln CLI generates example workflows for common hosting platforms. Workflows produced by `kiln deploy` use the following build pattern:
+The Engobe CLI generates example workflows for common hosting platforms. Workflows produced by `engobe deploy` use the following build pattern:
 
 - Restore tools: `dotnet tool restore`
-- Build site: `kiln build`
+- Build site: `engobe build`
 - Publish directory: `_site`
 
 Below are platform-specific recipes. CI YAML snippets must keep the same build commands used by the generated workflows.
 
 ### GitHub Pages (GitHub Actions)
 
-Kiln creates a GitHub Actions workflow at `.github/workflows/deploy.yml` when you run `kiln deploy github-pages`. The generated workflow uses `dotnet tool restore` and `kiln build` and then uploads `_site` as the pages artifact.
+Engobe creates a GitHub Actions workflow at `.github/workflows/deploy.yml` when you run `engobe deploy github-pages`. The generated workflow uses `dotnet tool restore` and `engobe build` and then uploads `_site` as the pages artifact.
 
 Example (generated by the CLI):
 
@@ -419,7 +433,7 @@ jobs:
 			- name: Restore tools
 				run: dotnet tool restore
 			- name: Build site
-				run: kiln build --base-url ${{ vars.SITE_URL || 'https://username.github.io/repo' }}
+				run: engobe build --base-url ${{ vars.SITE_URL || 'https://username.github.io/repo' }}
 			- name: Upload artifact
 				uses: actions/upload-pages-artifact@v3
 				with:
@@ -431,11 +445,11 @@ jobs:
 
 ### Azure Static Web Apps (GitHub Actions)
 
-Kiln generates `.github/workflows/azure-swa.yml` and a `staticwebapp.config.json` when you run `kiln deploy azure-swa`.
+Engobe generates `.github/workflows/azure-swa.yml` and a `staticwebapp.config.json` when you run `engobe deploy azure-swa`.
 
 Key points:
 
-- The generated job sets `app_build_command: "dotnet tool restore && kiln build"` to ensure tools are available during the build step.
+- The generated job sets `app_build_command: "dotnet tool restore && engobe build"` to ensure tools are available during the build step.
 - Output folder is `_site`.
 - `staticwebapp.config.json` contains a `routes`/`navigationFallback` and cache headers for `/assets/*`.
 
@@ -465,7 +479,7 @@ jobs:
 					azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
 					app_location: "/"
 					output_location: "_site"
-					app_build_command: "dotnet tool restore && kiln build"
+					app_build_command: "dotnet tool restore && engobe build"
 					skip_api_build: true
 ```
 
@@ -499,7 +513,7 @@ pool:
 steps:
 - script: |
 		dotnet tool restore
-		kiln build
+		engobe build
 	displayName: 'Restore tools and build'
 ```
 
@@ -510,7 +524,7 @@ Set the build command to the following (Netlify UI or netlify.toml):
 Build command:
 
 ```bash
-dotnet tool restore && kiln build
+dotnet tool restore && engobe build
 ```
 
 Publish directory: `_site`
@@ -522,18 +536,18 @@ Use a build command equivalent to Netlify. Ensure the selected environment suppo
 Build command:
 
 ```bash
-dotnet tool restore && kiln build
+dotnet tool restore && engobe build
 ```
 
 Publish directory: `_site`
 
 ### Generic CI
 
-Any CI system that can run `dotnet tool restore && kiln build` and publish `_site` as the artifact/website can be used.
+Any CI system that can run `dotnet tool restore && engobe build` and publish `_site` as the artifact/website can be used.
 
 ## NuGet Package Description
 
-Kiln — A fast, extensible static site generator for .NET. Collection-based content model, Scriban templates, plugin slots, CDN-friendly asset namespacing, built-in Atom feeds and sitemaps.
+Engobe — A fast, extensible static site generator for .NET. Collection-based content model, Scriban templates, plugin slots, CDN-friendly asset namespacing, built-in Atom feeds and sitemaps.
 
 ## Roadmap
 

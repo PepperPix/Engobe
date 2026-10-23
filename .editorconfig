@@ -10,14 +10,14 @@ insert_final_newline = true
 trim_trailing_whitespace = true
 
 # ── ReSharper / InspectCode suppressions (see ADR-008) ──
-# Deliberate namespace convention: Kiln.X (not Kiln.Core.X)
+# Deliberate namespace convention: Engobe.X (not Engobe.Core.X)
 resharper_check_namespace_highlighting = none
 # Cosmetic only — kept as IDE hint, below the WARNING gate threshold
 resharper_redundant_name_qualifier_highlighting = suggestion
 resharper_redundant_using_directive_highlighting = suggestion
 
 # Configuration DTOs use reflection-based deserialization (YamlDotNet).
-[src/Kiln.Core/Configuration/*.cs]
+[src/Engobe.Core/Configuration/*.cs]
 dotnet_diagnostic.CA1054.severity = none
 dotnet_diagnostic.CA1056.severity = none
 dotnet_diagnostic.S3996.severity = none
@@ -31,7 +31,7 @@ resharper_collection_never_updated_global_highlighting = none
 resharper_collection_never_updated_local_highlighting = none
 
 # Public model records are populated/consumed via serialization (YamlDotNet) and templates (Scriban).
-[src/Kiln.Core/Models/*.cs]
+[src/Engobe.Core/Models/*.cs]
 dotnet_diagnostic.CA1002.severity = none
 dotnet_diagnostic.CA1054.severity = none
 dotnet_diagnostic.CA1056.severity = none
@@ -41,18 +41,18 @@ dotnet_diagnostic.S1144.severity = none
 resharper_unused_auto_property_accessor_global_highlighting = none
 
 # PluginLoader holds a private manifest DTO deserialized from JSON/YAML.
-[src/Kiln.Core/Services/PluginLoader.cs]
+[src/Engobe.Core/Services/PluginLoader.cs]
 dotnet_diagnostic.S3459.severity = none
 dotnet_diagnostic.S1144.severity = none
 resharper_unused_auto_property_accessor_local_highlighting = none
 resharper_collection_never_updated_local_highlighting = none
 
-[src/Kiln.Core/Services/NuGetPluginClient.cs]
+[src/Engobe.Core/Services/NuGetPluginClient.cs]
 dotnet_diagnostic.CA1054.severity = none
 dotnet_diagnostic.S1075.severity = none
 
 # NuGet V3 flat-container paths require lowercase package IDs and versions.
-[src/Kiln.Core/Services/NuGetPluginPackageReader.cs]
+[src/Engobe.Core/Services/NuGetPluginPackageReader.cs]
 dotnet_diagnostic.CA1308.severity = none
 
 # Test fixtures intentionally include sample URLs and numeric literals for behavior verification.
@@ -66,7 +66,7 @@ dotnet_diagnostic.CA2000.severity = none
 dotnet_diagnostic.VSTHRD003.severity = none
 
 # Visibility fixtures are intentionally empty, unused and instance-shaped: the tests read only their metadata.
-[tests/Kiln.Core.Tests/Services/ApiSurfaceFixtures.cs]
+[tests/Engobe.Core.Tests/Services/ApiSurfaceFixtures.cs]
 dotnet_diagnostic.S1186.severity = none
 dotnet_diagnostic.S1144.severity = none
 dotnet_diagnostic.CA1822.severity = none
@@ -75,23 +75,23 @@ resharper_not_accessed_field_local_highlighting = none
 resharper_unused_auto_property_accessor_global_highlighting = none
 
 # Encoded image payload stays as raw bytes until written to disk.
-[src/Kiln.Core/Services/ImageOptimizationOutput.cs]
+[src/Engobe.Core/Services/ImageOptimizationOutput.cs]
 dotnet_diagnostic.CA1819.severity = none
 
 # Spectre.Console.Cli Settings properties are bound via reflection from CLI args.
-[src/Kiln.Cli/Commands/*.cs]
+[src/Engobe.Cli/Commands/*.cs]
 resharper_unused_auto_property_accessor_global_highlighting = none
 
 # Public API must be documented (CS1591 is an error via TreatWarningsAsErrors) ...
-[src/Kiln.Abstractions/**.cs]
+[src/Engobe.Abstractions/**.cs]
 dotnet_diagnostic.CS1591.severity = warning
 
-[src/Kiln.Core/**.cs]
+[src/Engobe.Core/**.cs]
 dotnet_diagnostic.CS1591.severity = warning
 
 # ... except concrete classes that are public for compatibility only; their members need no comments.
-[src/Kiln.Core/Configuration/SiteConfigLoader.cs]
+[src/Engobe.Core/Configuration/SiteConfigLoader.cs]
 dotnet_diagnostic.CS1591.severity = none
 
-[src/Kiln.Core/Services/{AssetReferenceIndexBuilder,ContentReader,DeploymentInitializer,DevServer,GeneratedContentSerializer,GeneratedContentWriter,MarkdownProcessor,NavigationTreeBuilder,NoOpAssetMinifier,NuGetPluginClient,NuglifyAssetMinifier,OpenApiDocGenerator,PagefindBinaryProvider,PagefindSearchIndexer,PermalinkGenerator,PluginContentHasher,PluginContentInspector,PluginLoader,PluginLockFile,PluginNames,PluginTrust,Scaffolder,ShortcodeProcessor,SiteBuilder,SkiaSharpImageOptimizer,SystemProcessRunner,TemplateRenderer,XmlDocGenerator,XmlDocParser}.cs]
+[src/Engobe.Core/Services/{AssetReferenceIndexBuilder,ContentReader,DeploymentInitializer,DevServer,GeneratedContentSerializer,GeneratedContentWriter,MarkdownProcessor,NavigationTreeBuilder,NoOpAssetMinifier,NuGetPluginClient,NuglifyAssetMinifier,OpenApiDocGenerator,PagefindBinaryProvider,PagefindSearchIndexer,PermalinkGenerator,PluginContentHasher,PluginContentInspector,PluginLoader,PluginLockFile,PluginNames,PluginTrust,Scaffolder,ShortcodeProcessor,SiteBuilder,SkiaSharpImageOptimizer,SystemProcessRunner,TemplateRenderer,XmlDocGenerator,XmlDocParser}.cs]
 dotnet_diagnostic.CS1591.severity = none

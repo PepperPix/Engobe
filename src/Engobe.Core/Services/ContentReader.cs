@@ -1,0 +1,352 @@
+namespace Engobe.Services;
+
+using System.Collections.ObjectModel;
+using Engobe.Models;
+using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
+
+/// <summary>
+/// Default <see cref="IContentReader"/> implementation that reads Markdown files with YAML front matter.
+/// </summary>
+/// <remarks>
+/// This type is public for compatibility but is not part of the supported API surface; it may change in any release. Depend on <see cref="IContentReader"/> instead.
+/// </remarks>
+public sealed class ContentReader(IMarkdownProcessor markdownProcessor, IShortcodeProcessor? shortcodeProcessor = null) : IContentReader
+{
+    private static readonly IDeserializer YamlDeserializer = new DeserializerBuilder()
+        .WithNamingConvention(CamelCaseNamingConvention.Instance)
+        .IgnoreUnmatchedProperties()
+        .Build();
+
+    private static readonly IDeserializer RawYamlDeserializer = new DeserializerBuilder()
+        .WithNamingConvention(CamelCaseNamingConvention.Instance)
+        .Build();
+
+    private static readonly HashSet<string> KnownFrontMatterKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "id", "title", "date", "draft", "layout", "slug", "description",
+        "url", "weight", "extra", "imageOptimization", "noIndex", "parent"
+    };
+
+    private readonly IShortcodeProcessor _shortcodeProcessor = shortcodeProcessor ?? new ShortcodeProcessor();
+
+    public IReadOnlyList<ContentItem> ReadCollection(
+        ContentGroup collection,
+        string projectPath,
+        IReadOnlyList<PluginDefinition>? plugins = null,
+        Collection<string>? warnings = null)
+    {
+        ArgumentNullException.ThrowIfNull(collection);
+        var contentDirectory = Path.IsPathRooted(collection.Directory)
+            ? collection.Directory
+            : Path.Combine(projectPath, collection.Directory);
+
+        if (!Directory.Exists(contentDirectory))
+            return [];
+
+        var items = new List<ContentItem>();
+        ReadSection(contentDirectory, contentDirectory, collection, items, plugins, warnings);
+        return ApplySort(items, collection.Sort);
+    }
+
+    private void ReadSection(string dir, string contentDirectory, ContentGroup collection, List<ContentItem> items, IReadOnlyList<PluginDefinition>? plugins, Collection<string>? warnings)
+    {
+        var sectionPath = ToSectionPath(contentDirectory, dir);
+
+        var files = Directory.GetFiles(dir, "*.md", SearchOption.TopDirectoryOnly);
+        var fileResults = new ContentItem?[files.Length];
+        Parallel.For(0, files.Length, i =>
+        {
+            fileResults[i] = ReadFile(files[i], contentDirectory, collection, assetDirectory: null, sectionPath, plugins, warnings);
+        });
+        foreach (var item in fileResults)
+        {
+            if (item is not null)
+                items.Add(item);
+        }
+
+        foreach (var subDir in Directory.GetDirectories(dir))
+        {
+            var indexFile = Path.Combine(subDir, "index.md");
+            if (File.Exists(indexFile))
+            {
+                var item = ReadFile(indexFile, contentDirectory, collection, assetDirectory: subDir, sectionPath, plugins, warnings);
+                if (item is not null)
+                    items.Add(item);
+            }
+            else
+            {
+                ReadSection(subDir, contentDirectory, collection, items, plugins, warnings);
+            }
+        }
+    }
+
+    private static string ToSectionPath(string contentDirectory, string dir)
+    {
+        var rel = Path.GetRelativePath(contentDirectory, dir);
+        if (rel == ".")
+            return "";
+        return rel.Replace(Path.DirectorySeparatorChar, '/');
+    }
+
+    public ContentItem ReadSingleFile(
+        string absoluteFilePath,
+        ContentGroup owningCollection,
+        IReadOnlyList<PluginDefinition>? plugins = null,
+        Collection<string>? warnings = null)
+    {
+        ArgumentNullException.ThrowIfNull(absoluteFilePath);
+        ArgumentNullException.ThrowIfNull(owningCollection);
+
+        if (!File.Exists(absoluteFilePath))
+            throw new FileNotFoundException($"Content file not found: {absoluteFilePath}", absoluteFilePath);
+
+        var contentDirectory = Path.GetDirectoryName(absoluteFilePath)
+            ?? throw new InvalidOperationException($"Could not resolve content directory for: {absoluteFilePath}");
+
+        var item = ReadFile(
+            absoluteFilePath,
+            contentDirectory,
+            owningCollection,
+            assetDirectory: null,
+            sectionPath: string.Empty,
+            plugins,
+            warnings)
+            ?? throw new InvalidOperationException($"Content file '{absoluteFilePath}' is missing valid front matter.");
+
+        return item;
+    }
+
+    private ContentItem? ReadFile(
+        string filePath,
+        string contentDirectory,
+        ContentGroup collection,
+        string? assetDirectory,
+        string sectionPath,
+        IReadOnlyList<PluginDefinition>? plugins,
+        Collection<string>? warnings)
+    {
+        var content = File.ReadAllText(filePath);
+        var (frontMatter, body, extraFromFrontMatter, rawAll) = ParseFrontMatter(content, collection);
+
+        if (frontMatter is null)
+            return null;
+
+        var relativePath = Path.GetRelativePath(contentDirectory, filePath).Replace(Path.DirectorySeparatorChar, '/');
+
+        var slug = frontMatter.Slug
+            ?? (assetDirectory is not null
+                ? Path.GetFileName(assetDirectory)
+                : Path.GetFileNameWithoutExtension(filePath));
+
+        var extra = new Dictionary<string, object>(frontMatter.Extra);
+        foreach (var (k, v) in extraFromFrontMatter)
+            extra.TryAdd(k, v);
+        if (!string.IsNullOrEmpty(frontMatter.PermalinkOverride))
+            extra["permalink_override"] = frontMatter.PermalinkOverride;
+
+        var taxonomies = new Dictionary<string, object>();
+        foreach (var taxName in collection.Taxonomies)
+        {
+            taxonomies[taxName] = rawAll.TryGetValue(taxName, out var rawValue)
+                ? ConvertToStringList(rawValue)
+                : new List<string>();
+        }
+
+        var effectiveSlugForAssets = string.IsNullOrEmpty(sectionPath) ? slug : $"{sectionPath}/{slug}";
+        var assetBasePath = assetDirectory is not null
+            ? $"/assets/content/{collection.Name}/{effectiveSlugForAssets}/"
+            : null;
+        var assetCatalog = assetDirectory is not null
+            ? new PageBundleAssetCatalog(assetDirectory)
+            : null;
+
+        var shortcodeWarnings = warnings ?? new Collection<string>();
+        var processedBody = _shortcodeProcessor.Process(body, plugins ?? [], shortcodeWarnings);
+
+        var moreMarkerIndex = processedBody.IndexOf(MoreMarker, StringComparison.Ordinal);
+        var htmlBody = moreMarkerIndex >= 0
+            ? processedBody.Replace(MoreMarker, "", StringComparison.Ordinal)
+            : processedBody;
+
+        string? teaser = frontMatter.Description;
+        if (string.IsNullOrEmpty(teaser))
+        {
+            teaser = moreMarkerIndex >= 0
+                ? markdownProcessor.ToPlainText(processedBody[..moreMarkerIndex])
+                : TruncateToWords(markdownProcessor.ToPlainText(processedBody), collection.TeaserWords);
+        }
+
+        var renderedHtml = assetCatalog is not null
+            ? MarkdownProcessor.ToBundleHtml(markdownProcessor, htmlBody, (destination, isImage) =>
+                ResolveBundleReference(destination, isImage, assetCatalog, assetBasePath!, filePath, shortcodeWarnings))
+            : markdownProcessor.ToHtml(htmlBody, assetBasePath);
+
+        return new ContentItem
+        {
+            Id = frontMatter.Id,
+            Parent = frontMatter.Parent,
+            Title = frontMatter.Title,
+            Date = frontMatter.Date,
+            Draft = frontMatter.Draft,
+            Slug = slug,
+            SectionPath = sectionPath,
+            Description = frontMatter.Description,
+            Teaser = teaser,
+            Layout = frontMatter.Layout,
+            Weight = frontMatter.Weight,
+            SourcePath = filePath,
+            RelativePath = relativePath,
+            RawContent = processedBody,
+            HtmlContent = renderedHtml,
+            Url = collection.Url,
+            OutputPath = "",
+            Collection = collection,
+            Extra = extra,
+            Taxonomies = taxonomies,
+            AssetDirectory = assetDirectory,
+            ImageOptimization = frontMatter.ImageOptimization ?? true,
+            NoIndex = frontMatter.NoIndex
+        };
+    }
+
+    private static string? ResolveBundleReference(
+        string destination,
+        bool isImage,
+        PageBundleAssetCatalog catalog,
+        string assetBasePath,
+        string sourceFile,
+        Collection<string> warnings)
+    {
+        if (destination.StartsWith("/", StringComparison.Ordinal)
+            || destination.StartsWith("#", StringComparison.Ordinal)
+            || Uri.TryCreate(destination, UriKind.Absolute, out _))
+        {
+            return null;
+        }
+
+        var suffixStart = destination.IndexOfAny(['?', '#']);
+        var referencePath = suffixStart < 0 ? destination : destination[..suffixStart];
+        var suffix = suffixStart < 0 ? "" : destination[suffixStart..];
+        if (referencePath.Length == 0)
+            return null;
+
+        var rawSegments = new List<string>();
+        var fileSegments = new List<string>();
+        foreach (var segment in referencePath.Replace('\\', '/').Split('/'))
+        {
+            if (segment.Length == 0)
+                continue;
+
+            var decodedSegment = Uri.UnescapeDataString(segment);
+            if (decodedSegment is ".")
+                continue;
+
+            if (decodedSegment is "..")
+            {
+                if (fileSegments.Count == 0)
+                    return null;
+
+                rawSegments.RemoveAt(rawSegments.Count - 1);
+                fileSegments.RemoveAt(fileSegments.Count - 1);
+                continue;
+            }
+
+            if (decodedSegment.Contains('/', StringComparison.Ordinal) || decodedSegment.Contains('\\', StringComparison.Ordinal))
+                return null;
+
+            rawSegments.Add(segment);
+            fileSegments.Add(decodedSegment);
+        }
+
+        if (rawSegments.Count == 0)
+            return null;
+
+        var relativePath = Path.Combine(fileSegments.ToArray());
+        if (catalog.IsHiddenOrSymbolicLink(relativePath))
+            return null;
+
+        if (catalog.IsExcludedMarkdownTarget(relativePath))
+        {
+            warnings.Add($"Page bundle reference in '{sourceFile}' targets excluded Markdown file '{destination}'.");
+            return null;
+        }
+
+        if (!isImage && !catalog.ContainsAsset(relativePath))
+            return null;
+
+        var normalizedUrlPath = string.Join('/', rawSegments);
+        return assetBasePath.TrimEnd('/') + "/" + normalizedUrlPath + suffix;
+    }
+
+    private const string MoreMarker = "<!--more-->";
+
+    /// <summary>
+    /// Truncates plain text to the first <paramref name="wordCount"/> words, cut at a word
+    /// boundary, appending "…" only when the text was actually longer than the limit.
+    /// </summary>
+    private static string TruncateToWords(string text, int wordCount)
+    {
+        var normalized = text.Replace('\n', ' ').Replace('\r', ' ');
+        var words = normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length <= wordCount)
+            return string.Join(' ', words);
+        return string.Join(' ', words[..wordCount]) + "…";
+    }
+
+    private static List<ContentItem> ApplySort(List<ContentItem> items, string sort)
+    {
+        return sort switch
+        {
+            "date desc" => [.. items.OrderByDescending(i => i.Date)],
+            "date asc" => [.. items.OrderBy(i => i.Date)],
+            "title asc" => [.. items.OrderBy(i => i.Title, StringComparer.OrdinalIgnoreCase)],
+            "weight asc" => [.. items.OrderBy(i => i.Weight).ThenBy(i => i.Title, StringComparer.OrdinalIgnoreCase)],
+            _ => items
+        };
+    }
+
+    private static (FrontMatter? frontMatter, string body, Dictionary<string, object> extraFromFrontMatter, Dictionary<string, object> rawAll) ParseFrontMatter(string content, ContentGroup collection)
+    {
+        if (!content.StartsWith("---", StringComparison.Ordinal))
+            return (null, content, [], []);
+
+        var endIndex = content.IndexOf("---", 3, StringComparison.Ordinal);
+        if (endIndex < 0)
+            return (null, content, [], []);
+
+        var yamlBlock = content[3..endIndex].Trim();
+        var body = content[(endIndex + 3)..].Trim();
+
+        var frontMatter = YamlDeserializer.Deserialize<FrontMatter>(yamlBlock);
+
+        var rawAll = RawYamlDeserializer.Deserialize<Dictionary<string, object>>(yamlBlock);
+        var excludedKeys = new HashSet<string>(KnownFrontMatterKeys, StringComparer.OrdinalIgnoreCase);
+        foreach (var taxName in collection.Taxonomies)
+            excludedKeys.Add(taxName);
+        var extraFromFrontMatter = rawAll
+            .Where(kvp => !excludedKeys.Contains(kvp.Key))
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
+        return (frontMatter, body, extraFromFrontMatter, rawAll);
+    }
+
+    /// <summary>
+    /// Converts a raw YAML value (as produced by <see cref="RawYamlDeserializer"/> when deserializing
+    /// into a <see cref="Dictionary{TKey, TValue}"/>) into a string list. Handles a YAML sequence
+    /// (deserialized as <see cref="List{Object}"/>), a single bare scalar (e.g. <c>tags: dotnet</c>),
+    /// and a missing/null value.
+    /// </summary>
+    private static List<string> ConvertToStringList(object? rawValue)
+    {
+        switch (rawValue)
+        {
+            case null:
+                return [];
+            case List<object?> list:
+                return [.. list.Where(static v => v is not null).Select(static v => v!.ToString()!)];
+            default:
+                return [rawValue.ToString()!];
+        }
+    }
+}

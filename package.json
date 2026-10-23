@@ -1,8 +1,8 @@
 {
-	"name": "kiln-release",
+	"name": "engobe-release",
 	"version": "0.0.0-development",
 	"private": true,
-	"description": "Release tooling for the Kiln static site generator.",
+	"description": "Release tooling for the Engobe static site generator.",
 	"scripts": {
 		"prepare": "husky"
 	},
@@ -70,9 +70,9 @@
 		],
 		"includeSymbols": true,
 		"projectPath": [
-			"src/Kiln.Abstractions/Kiln.Abstractions.csproj",
-			"src/Kiln.Core/Kiln.Core.csproj",
-			"src/Kiln.Cli/Kiln.Cli.csproj"
+			"src/Engobe.Abstractions/Engobe.Abstractions.csproj",
+			"src/Engobe.Core/Engobe.Core.csproj",
+			"src/Engobe.Cli/Engobe.Cli.csproj"
 		],
 		"npmPublish": false,
 		"usePackageVersion": true

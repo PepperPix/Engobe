@@ -1,0 +1,145 @@
+namespace Engobe.Cli.Commands;
+
+using System.ComponentModel;
+using Engobe.Models;
+using Engobe.Services;
+using NuGet.Protocol.Core.Types;
+using Spectre.Console;
+using Spectre.Console.Cli;
+
+public sealed class PluginAddCommand(
+    INuGetPluginClient nuGetPluginClient,
+    IPluginLockFile pluginLockFile,
+    IAnsiConsole console) : AsyncCommand<PluginAddCommand.Settings>
+{
+    public sealed class Settings : CommandSettings
+    {
+        [CommandArgument(0, "<package-id>")]
+        [Description("NuGet package ID to install.")]
+        public string PackageId { get; init; } = string.Empty;
+
+        [CommandOption("--version")]
+        [Description("Package version to install. Defaults to latest stable release.")]
+        public string? Version { get; init; }
+
+        [CommandOption("--source")]
+        [Description("Local NuGet folder feed or NuGet v3 service index URL. Saved for future updates.")]
+        public string? Source { get; init; }
+
+        [CommandOption("--force")]
+        [Description("Overwrite an existing plugin directory even if it has local changes.")]
+        public bool Force { get; init; }
+
+        [CommandOption("-y|--yes")]
+        [Description("Install community plugins without asking for confirmation.")]
+        public bool Yes { get; init; }
+
+        [CommandArgument(1, "[path]")]
+        [Description("Project path. Defaults to the current directory.")]
+        public string Path { get; init; } = ".";
+    }
+
+    public override async Task<int> ExecuteAsync(CommandContext context, Settings settings, CancellationToken cancellationToken)
+    {
+        var projectPath = Path.GetFullPath(settings.Path);
+        PluginPackageSource source;
+        try
+        {
+            source = PluginPackageSource.Resolve(settings.Source, projectPath, nuGetPluginClient);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or IOException or UnauthorizedAccessException)
+        {
+            console.MarkupLine("[red]ERROR:[/] Could not resolve the plugin package source. Check the source path or URL and NuGet configuration.");
+            return 1;
+        }
+
+        console.MarkupLine("[yellow]IMPORTANT:[/] This plugin can inject arbitrary HTML/JavaScript into pages. Install only from a trustworthy source.");
+
+        var version = settings.Version;
+        var verificationWarningReported = false;
+        if (!settings.Yes)
+        {
+            PluginPackageInfo info;
+            try
+            {
+                info = await source.Client.GetInfoAsync(settings.PackageId, settings.Version, ReportVerificationWarning, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or FatalProtocolException or IOException)
+            {
+                if (ex is PluginPackageVerificationException verification)
+                    console.MarkupLine($"[yellow]WARN:[/] {Markup.Escape(verification.Warning)}");
+                console.MarkupLine($"[red]ERROR:[/] {Markup.Escape(ex.Message)}");
+                return 1;
+            }
+
+            // Install exactly the version that was shown.
+            version = info.Version;
+            if (info.Trust != PluginTrustLevel.FirstParty && !await ConfirmCommunityInstallAsync(info, cancellationToken).ConfigureAwait(false))
+                return 1;
+        }
+
+        PluginPackageInstallResult installResult;
+        try
+        {
+            var options = new PluginInstallOptions
+            {
+                Force = settings.Force,
+                ExistingLockEntries = await pluginLockFile.ReadAsync(projectPath, cancellationToken).ConfigureAwait(false),
+                ReportPackageVerificationWarning = ReportVerificationWarning,
+            };
+            installResult = await source.Client.AddAsync(settings.PackageId, version, projectPath, options, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or FatalProtocolException or IOException)
+        {
+            if (ex is PluginPackageVerificationException verification)
+                console.MarkupLine($"[yellow]WARN:[/] {Markup.Escape(verification.Warning)}");
+            console.MarkupLine($"[red]ERROR:[/] {Markup.Escape(ex.Message)}");
+            return 1;
+        }
+
+        if (!verificationWarningReported && installResult.PackageVerificationWarning is { } warning)
+            console.MarkupLine($"[yellow]WARN:[/] {Markup.Escape(warning)}");
+
+        await pluginLockFile.SetAsync(projectPath, installResult.PluginName, new PluginLockEntry(
+            installResult.PackageId,
+            installResult.Version,
+            source.LockValue)
+        {
+            ContentHash = installResult.ContentHash,
+            Trust = installResult.Trust,
+        }, cancellationToken).ConfigureAwait(false);
+
+        var package = $"{Markup.Escape(installResult.PackageId)} {Markup.Escape(installResult.Version)}";
+        console.MarkupLine($"[green]Installed plugin:[/] {Markup.Escape(installResult.PluginName)} ({package}) at {Markup.Escape(installResult.InstallPath)}");
+        console.MarkupLine($"[dim]Trust level: {PluginTrustDisplay.Label(installResult.Trust)}[/]");
+        console.MarkupLine("[dim]Activate it in site.yaml under the relevant collection/plugins section.[/]");
+        return 0;
+
+        void ReportVerificationWarning(string message)
+        {
+            if (!verificationWarningReported)
+                console.MarkupLine($"[yellow]WARN:[/] {Markup.Escape(message)}");
+            verificationWarningReported = true;
+        }
+    }
+
+    private async Task<bool> ConfirmCommunityInstallAsync(PluginPackageInfo info, CancellationToken cancellationToken)
+    {
+        PluginInfoRenderer.Render(console, info);
+
+        if (!console.Profile.Capabilities.Interactive)
+        {
+            console.MarkupLine("[red]ERROR:[/] Confirmation required for community plugins. Re-run with --yes.");
+            return false;
+        }
+
+        var confirmed = await console.ConfirmAsync(
+            prompt: $"Install community plugin '{Markup.Escape(info.PackageId)}' {Markup.Escape(info.Version)}? It can inject HTML/JavaScript into every page of your site.",
+            defaultValue: false,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (!confirmed)
+            console.MarkupLine("[yellow]Installation cancelled.[/]");
+
+        return confirmed;
+    }
+}

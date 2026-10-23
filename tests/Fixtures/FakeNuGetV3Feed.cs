@@ -1,4 +1,4 @@
-namespace Kiln.Tests;
+namespace Engobe.Tests;
 
 using System.Collections.Concurrent;
 using System.Globalization;
@@ -8,7 +8,7 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Kiln.Services;
+using Engobe.Services;
 using NuGet.Protocol;
 using NuGet.Protocol.Core.Types;
 
@@ -18,7 +18,7 @@ internal sealed class FakeNuGetV3Feed : IAsyncDisposable
     private readonly CancellationTokenSource _stop = new();
     private readonly ConcurrentDictionary<string, byte[]> _responses = new(StringComparer.Ordinal);
     private readonly Task _server;
-    private readonly string _root = Path.Combine(Path.GetTempPath(), $"kiln-v3-{Guid.NewGuid():N}");
+    private readonly string _root = Path.Combine(Path.GetTempPath(), $"engobe-v3-{Guid.NewGuid():N}");
 
     public FakeNuGetV3Feed()
     {
@@ -57,7 +57,7 @@ internal sealed class FakeNuGetV3Feed : IAsyncDisposable
         {
             WriteEntry(zip, $"{id}.nuspec",
                 $"<package><metadata><id>{id}</id><version>{version}</version><authors>Test</authors>" +
-                "<description>Test plugin</description><tags>kiln-plugin</tags></metadata></package>");
+                "<description>Test plugin</description><tags>engobe-plugin</tags></metadata></package>");
             WriteEntry(zip, "content/plugin.yaml", $"name: verified\nversion: {version}\n");
             WriteEntry(zip, "content/static/plugin.js", $"console.log('{version}');");
         }
