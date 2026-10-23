@@ -29,4 +29,11 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
   </ItemGroup>
 
+  <!-- NuGet's symbol server rejects native Windows PDBs shipped by runtime dependencies. -->
+  <Target Name="ExcludeNativeToolSymbols" AfterTargets="PackTool">
+    <ItemGroup>
+      <TfmSpecificPackageFile Remove="$(PublishDir)runtimes/**/native/*.pdb" />
+    </ItemGroup>
+  </Target>
+
 </Project>
