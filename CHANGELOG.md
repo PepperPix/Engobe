@@ -1,3 +1,177 @@
+# [2.0.0-beta.9](https://github.com/PepperPix/Engobe/compare/v2.0.0-beta.8...v2.0.0-beta.9) (2026-10-23)
+
+
+### Bug Fixes
+
+* exclude native pdbs from tool symbol packages ([f9c1613](https://github.com/PepperPix/Engobe/commit/f9c1613ac5a45e4e54530dcb8747e601432cddc7))
+
+# [2.0.0-beta.8](https://github.com/PepperPix/Engobe/compare/v2.0.0-beta.7...v2.0.0-beta.8) (2026-10-23)
+
+
+### Features
+
+* rebrand engine and cli as engobe ([31ba7c0](https://github.com/PepperPix/Engobe/commit/31ba7c0e2152b2355f2130e74d65637a41af3a0c))
+
+
+### BREAKING CHANGES
+
+* Rename Kiln packages, commands, public APIs and project state to Engobe.
+No legacy aliases or automatic migration are provided.
+
+# [2.0.0-beta.7](https://github.com/PepperPix/Kiln/compare/v2.0.0-beta.6...v2.0.0-beta.7) (2026-10-22)
+
+
+### Bug Fixes
+
+* address beta release review feedback ([37a0952](https://github.com/PepperPix/Kiln/commit/37a09522731a3c43a9169b02f99b43355229692d))
+
+# [2.0.0-beta.6](https://github.com/PepperPix/Kiln/compare/v2.0.0-beta.5...v2.0.0-beta.6) (2026-10-22)
+
+
+### Features
+
+* **plugins:** verify NuGet package hashes ([#49](https://github.com/PepperPix/Kiln/issues/49)) ([373dfae](https://github.com/PepperPix/Kiln/commit/373dfae588a5233e3886619252f130f08f133433))
+
+# [2.0.0-beta.5](https://github.com/PepperPix/Kiln/compare/v2.0.0-beta.4...v2.0.0-beta.5) (2026-10-22)
+
+
+### Features
+
+* support nested page bundle assets ([#48](https://github.com/PepperPix/Kiln/issues/48)) ([08a57ac](https://github.com/PepperPix/Kiln/commit/08a57ac6f0abaa0f5bf791bf400ed8f943ddfde7))
+
+# [2.0.0-beta.4](https://github.com/PepperPix/Kiln/compare/v2.0.0-beta.3...v2.0.0-beta.4) (2026-10-22)
+
+
+### Features
+
+* **navigation:** support parent overrides and section context ([#47](https://github.com/PepperPix/Kiln/issues/47)) ([34960d4](https://github.com/PepperPix/Kiln/commit/34960d42e325b664cb2562a24bb23a6beabf2f5c))
+
+# [2.0.0-beta.3](https://github.com/PepperPix/Kiln/compare/v2.0.0-beta.2...v2.0.0-beta.3) (2026-10-22)
+
+
+### Bug Fixes
+
+* **core:** warn when no homepage is configured ([#46](https://github.com/PepperPix/Kiln/issues/46)) ([83f5bac](https://github.com/PepperPix/Kiln/commit/83f5baccac1b12a9b9fa9c3c719d351fc86b8623))
+
+# [2.0.0-beta.2](https://github.com/PepperPix/Kiln/compare/v2.0.0-beta.1...v2.0.0-beta.2) (2026-10-22)
+
+
+### Features
+
+* **collections:** render unpaginated indexes ([f5077bc](https://github.com/PepperPix/Kiln/commit/f5077bcd4ce5878d6cfe65192ed5f5133c63c8e7))
+
+# [2.0.0-beta.1](https://github.com/PepperPix/Kiln/compare/v1.3.0-beta.9...v2.0.0-beta.1) (2026-10-21)
+
+
+* feat(assets)!: support cdn asset prefixes ([c548938](https://github.com/PepperPix/Kiln/commit/c5489384060be8a901ad613732affb435809a9a8))
+
+
+### Bug Fixes
+
+* **assets:** make validation tests portable on windows ([67915e3](https://github.com/PepperPix/Kiln/commit/67915e38bd89ae80a454542126f17ced6c437957))
+
+
+### BREAKING CHANGES
+
+* site.asset_prefix now includes the site base path and a trailing slash.
+Remove additional base-path composition from custom themes.
+
+# [1.3.0-beta.9](https://github.com/PepperPix/Kiln/compare/v1.3.0-beta.8...v1.3.0-beta.9) (2026-10-19)
+
+
+### Bug Fixes
+
+* **deps:** update vulnerable and stale dependencies ([69185db](https://github.com/PepperPix/Kiln/commit/69185db0d5d32045ed8ec5d9fc644487bbf0d250))
+
+# [1.3.0-beta.8](https://github.com/PepperPix/Kiln/compare/v1.3.0-beta.7...v1.3.0-beta.8) (2026-10-01)
+
+
+### Features
+
+* **core:** ship an api layout in the default theme ([5c83d29](https://github.com/PepperPix/Kiln/commit/5c83d29129d3e23f8ee285ef15dcf2d21bf619c5))
+
+# [1.3.0-beta.7](https://github.com/PepperPix/Kiln/compare/v1.3.0-beta.6...v1.3.0-beta.7) (2026-10-01)
+
+
+### Features
+
+* **cli:** add --package-version to gen dotnet-xml ([cebd0e5](https://github.com/PepperPix/Kiln/commit/cebd0e55130735689e62971d4acce02d5ab2af54))
+
+# [1.3.0-beta.6](https://github.com/PepperPix/Kiln/compare/v1.3.0-beta.5...v1.3.0-beta.6) (2026-10-01)
+
+
+### Bug Fixes
+
+* **core:** derive navigation section URLs from an item of that section ([d25c024](https://github.com/PepperPix/Kiln/commit/d25c02417ebaec8766d511918a1b17a92a7524db))
+
+# [1.3.0-beta.5](https://github.com/PepperPix/Kiln/compare/v1.3.0-beta.4...v1.3.0-beta.5) (2026-09-30)
+
+
+### Features
+
+* **cli:** add --assembly option to gen dotnet-xml ([3dd8b10](https://github.com/PepperPix/Kiln/commit/3dd8b10653658e997cf05577668cac95e9a862b6))
+* **core:** filter generated .NET reference pages by assembly visibility ([e8826db](https://github.com/PepperPix/Kiln/commit/e8826db62dd58dde84d67dd29b2c7ea479bd460a))
+
+# [1.3.0-beta.4](https://github.com/PepperPix/Kiln/compare/v1.3.0-beta.3...v1.3.0-beta.4) (2026-09-30)
+
+
+### Features
+
+* **core:** ship XML documentation with the packages ([7c2b623](https://github.com/PepperPix/Kiln/commit/7c2b6230d6191e1908c2e16d107356bb66d1efef))
+
+# [1.3.0-beta.3](https://github.com/PepperPix/Kiln/compare/v1.3.0-beta.2...v1.3.0-beta.3) (2026-09-30)
+
+
+### Bug Fixes
+
+* **core:** honor search.binaryPath when resolving the Pagefind binary ([3ea9180](https://github.com/PepperPix/Kiln/commit/3ea9180520c803e3938409ed75232f864156321d))
+
+# [1.3.0-beta.2](https://github.com/PepperPix/Kiln/compare/v1.3.0-beta.1...v1.3.0-beta.2) (2026-09-29)
+
+
+### Bug Fixes
+
+* **core:** kill child process on cancellation ([ab06146](https://github.com/PepperPix/Kiln/commit/ab06146c931ca4d6511a675e15d52b7c5aa98208))
+* **core:** load plugins in deterministic order ([0266d1c](https://github.com/PepperPix/Kiln/commit/0266d1c37a55b9c5da05d3d0cb3813600f5d9c44))
+* **core:** observe dev server rebuild task exceptions ([c968e4f](https://github.com/PepperPix/Kiln/commit/c968e4f4b751a42a4feea366676051e6e4c10886))
+* **core:** require pagefind 1.5.0 for path binaries ([cf77952](https://github.com/PepperPix/Kiln/commit/cf77952ea987ed5ec9fd49f1ea2fcac621b8ee50))
+* **core:** skip inline code in shortcodes ([4295638](https://github.com/PepperPix/Kiln/commit/429563826a01597ab2fa7c992532618c0f6e1937))
+
+
+### Features
+
+* **cli:** keep existing deploy files unless --force ([77d09c7](https://github.com/PepperPix/Kiln/commit/77d09c76dce8bea83db2a51b025536a058a5e856))
+
+
+### Performance Improvements
+
+* **core:** cache parsed templates ([d43d093](https://github.com/PepperPix/Kiln/commit/d43d0939a7cc9d8f9924e667180b6779984750ff))
+
+# [1.3.0-beta.1](https://github.com/PepperPix/Kiln/compare/v1.2.0...v1.3.0-beta.1) (2026-09-29)
+
+
+### Bug Fixes
+
+* **plugins:** allow removing legacy plugin directories ([b69328a](https://github.com/PepperPix/Kiln/commit/b69328a3b6e9a3519bb18f6845cf077d311c7f43))
+* **plugins:** keep ignored-handler constructors as obsolete instead of removing them ([476d3c2](https://github.com/PepperPix/Kiln/commit/476d3c29bf1f998fa1c6f8d18a9246eca1d4ffa3))
+* **plugins:** require only the kiln-plugin tag and drop the id prefix requirement ([a813483](https://github.com/PepperPix/Kiln/commit/a813483c437d22df1a94208b59654b31492386f8))
+
+
+### Features
+
+* **plugins:** add allow-any-package and force options and escape markup output ([efa9577](https://github.com/PepperPix/Kiln/commit/efa95779f684f674b581adad232df0fdf9428fdf))
+* **plugins:** add plugin info command ([fd96005](https://github.com/PepperPix/Kiln/commit/fd960057e0de6b97ede991507ccf0d56bdafa1ca))
+* **plugins:** classify plugin trust level and add package inspection ([4e8b11f](https://github.com/PepperPix/Kiln/commit/4e8b11ffb14c07f7e1fb1fc337c11f4783623c23))
+* **plugins:** confirm community plugin installs ([0152105](https://github.com/PepperPix/Kiln/commit/015210593f7d204f34f7e166a7c1653aded40a66))
+* **plugins:** confirm significant plugin updates ([8c615bb](https://github.com/PepperPix/Kiln/commit/8c615bb68f33f548ac9fbcf43d6a62733f132de8))
+* **plugins:** enforce plugin convention, record content hash and protect local changes ([fb10d8d](https://github.com/PepperPix/Kiln/commit/fb10d8d43a3eef0cdee8daa5aefef1f294d1b675))
+* **plugins:** show trust level in plugin search and list ([e25c8e7](https://github.com/PepperPix/Kiln/commit/e25c8e758bfcc4e2b20b5139fd89668dbc2704a5))
+
+
+### Reverts
+
+* remove unused http handler constructors from nuget plugin client ([df89e61](https://github.com/PepperPix/Kiln/commit/df89e61529f24d8ee6d10da83422e264d0c3985a))
+
 # [1.2.0](https://github.com/PepperPix/Kiln/compare/v1.1.0...v1.2.0) (2026-09-29)
 
 

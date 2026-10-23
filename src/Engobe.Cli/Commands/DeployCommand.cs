@@ -1,0 +1,95 @@
+namespace Engobe.Cli.Commands;
+
+using System.ComponentModel;
+using Engobe.Models;
+using Engobe.Services;
+using Spectre.Console;
+using Spectre.Console.Cli;
+
+public sealed class DeployCommand(IDeploymentInitializer deploymentInitializer, IAnsiConsole console) : Command<DeployCommand.Settings>
+{
+    public sealed class Settings : CommandSettings
+    {
+        [CommandArgument(0, "<target>")]
+        [Description("Deployment target (github-pages, azure-swa).")]
+        public required string Target { get; init; }
+
+        [CommandOption("-p|--path")]
+        [Description("Path to the site project directory. Defaults to current directory.")]
+        public string Path { get; init; } = ".";
+
+        [CommandOption("--force")]
+        [Description("Overwrite deployment files that already exist.")]
+        public bool Force { get; init; }
+    }
+
+    public override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken)
+    {
+        var projectPath = System.IO.Path.GetFullPath(settings.Path);
+        if (!TryParseTarget(settings.Target, out var target))
+        {
+            console.MarkupLine($"[red]Error:[/] Unknown deployment target: {Markup.Escape(settings.Target)}. Supported: github-pages, azure-swa.");
+            return 1;
+        }
+
+        try
+        {
+            var result = deploymentInitializer.Initialize(target, projectPath, new DeploymentInitOptions(settings.Force), cancellationToken);
+            foreach (var createdFile in result.CreatedFiles)
+            {
+                var fullPath = Path.Combine(projectPath, Path.Combine(createdFile.Split('/')));
+                console.MarkupLine($"[green]Created[/] [blue]{Markup.Escape(fullPath)}[/]");
+            }
+
+            foreach (var skippedFile in result.SkippedFiles)
+            {
+                var fullPath = Path.Combine(projectPath, Path.Combine(skippedFile.Split('/')));
+                console.MarkupLine($"[yellow]Skipped (exists)[/] [blue]{Markup.Escape(fullPath)}[/] - use --force to overwrite");
+            }
+
+            return 0;
+        }
+        catch (InvalidOperationException ex)
+        {
+            return WriteError(ex.Message);
+        }
+        catch (IOException ex)
+        {
+            return WriteError(ex.Message);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return WriteError(ex.Message);
+        }
+        catch (NotSupportedException ex)
+        {
+            return WriteError(ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            return WriteError(ex.Message);
+        }
+    }
+
+    private static bool TryParseTarget(string target, out DeploymentTarget deploymentTarget)
+    {
+        switch (target.ToUpperInvariant())
+        {
+            case "GITHUB-PAGES":
+                deploymentTarget = DeploymentTarget.GitHubPages;
+                return true;
+            case "AZURE-SWA":
+                deploymentTarget = DeploymentTarget.AzureStaticWebApps;
+                return true;
+            default:
+                deploymentTarget = default;
+                return false;
+        }
+    }
+
+    private int WriteError(string message)
+    {
+        console.MarkupLine($"[red]Error:[/] {Markup.Escape(message)}");
+        return 1;
+    }
+}

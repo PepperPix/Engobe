@@ -1,24 +1,24 @@
 <Project>
   <PropertyGroup>
-    <Version>1.2.0</Version>
-    <InformationalVersion>1.2.0</InformationalVersion>
-    <RepositoryCommit>73d049c909ae19b7c1005b4ad60701416e44e2fe</RepositoryCommit>
+    <Version>2.0.0-beta.9</Version>
+    <InformationalVersion>2.0.0-beta.9</InformationalVersion>
+    <RepositoryCommit>f9c1613ac5a45e4e54530dcb8747e601432cddc7</RepositoryCommit>
     <Authors>Marcel Kummerow</Authors>
     <Company>CScharf</Company>
-    <Product>Kiln</Product>
+    <Product>Engobe</Product>
     <Copyright>Copyright © 2026 Marcel Kummerow</Copyright>
     <TargetFramework>net10.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <RepositoryUrl>https://github.com/PepperPix/Kiln</RepositoryUrl>
+    <RepositoryUrl>https://github.com/PepperPix/Engobe</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.StaticAnalysis" Version="10.*">
+    <PackageReference Include="Microsoft.Extensions.StaticAnalysis" Version="10.11.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>

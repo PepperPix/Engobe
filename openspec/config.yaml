@@ -1,0 +1,47 @@
+schema: spec-driven
+
+context: |
+  Language: en
+  Write all artifacts in simple, formal technical English.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+  This is the standalone OpenSpec root for Engobe (PepperPix/Engobe), a static site
+  generator and CLI. The repository contains the engine, CLI, tests, and product
+  documentation. Current specifications are in specs/kiln/; active changes are
+  in changes/. This root does not depend on an external planning repository.
+  Configuration keys use camelCase; Scriban template variables use snake_case.
+  Product code is under src/ and tests are under tests/. Use the existing .NET
+  solution, build configuration, and TUnit settings.
+  Plan, implement, and independently review changes in separate passes.
+  OpenSpec files are versioned planning documents, not site content or package
+  inputs. Do not add agent configuration, author markers, or generated-author
+  notices. Do not include private planning references or author trailers in
+  public artifacts, commits, or pull requests.
+
+rules:
+  proposal:
+    - Change names start with engobe-.
+    - State the target repository and branch; use a feature branch from beta and merge into beta.
+    - State the scope and non-goals explicitly.
+    - Resolve architecture decisions with the maintainer and record their technical reasons in design.md.
+  specs:
+    - Specify observable behavior and stable CLI, configuration, template, and output contracts rather than class structure.
+    - Keep requirement names consistent between main specifications and change deltas.
+  tasks:
+    - End with validation in this repository, including build, tests, inspection, and Git hygiene.
+    - "Run rtk dotnet build with zero warnings or errors, dotnet test without rtk using the existing TUnit settings, and jb inspectcode Engobe.slnx -e=WARNING -f=Text with zero findings."
+    - Include an end-to-end check when observable behavior changes and clean up only the files created for that check.
+    - Inspect the staged file list and diff, then inspect rtk git show --stat HEAD after committing for unexpected files.
+
+operations:
+  apply:
+    guidance:
+      - Implement code and update task checkboxes within this repository and this OpenSpec root.
+      - Confirm that the actual execution context permits writes here; this guidance does not grant or extend runtime permissions.
+      - Stop for unclear requirements or new architecture decisions instead of silently changing scope.
+      - Mark tasks complete in their local tasks.md immediately after their specified behavior is fully implemented.
+      - Use Conventional Commits for semantic-release; keep messages short and omit planning identifiers and author trailers.
+      - Complete validation before handing the change to an independent review pass; report existing failures separately.
+  archive:
+    guidance:
+      - After independent review, synchronize applicable deltas into local specs/kiln/ and archive the change before finalizing or merging its pull request, so the main specs and archive move are included in the pull request's merge or squash commit.
+      - Keep the local specifications authoritative and remove merged feature branches when appropriate.
