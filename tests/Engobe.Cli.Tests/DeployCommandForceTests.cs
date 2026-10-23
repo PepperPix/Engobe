@@ -48,7 +48,7 @@ public class DeployCommandForceTests
         await Assert.That(result.ExitCode).IsEqualTo(0);
         await Assert.That(console.Output).Contains("Created");
         await Assert.That(console.Output).Contains("staticwebapp.config.json");
-        await Assert.That(console.Output).Contains(projectPath);
+        await Assert.That(console.Output).Contains(Path.GetFullPath(projectPath));
         await Assert.That(console.Output).Contains("Skipped (exists)");
         await Assert.That(console.Output).Contains("azure-swa.yml");
         await Assert.That(console.Output).Contains("--force");

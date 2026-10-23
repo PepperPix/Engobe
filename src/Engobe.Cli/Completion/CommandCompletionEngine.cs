@@ -21,7 +21,7 @@ internal static class CommandCompletionEngine
         for (var index = 1; index < completeWordCount; index++)
         {
             var word = words[index];
-            if (word.StartsWith("-", StringComparison.Ordinal))
+            if (word.StartsWith("-", StringComparison.Ordinal) || !container.Commands.Any())
                 break;
 
             var command = container.Commands.FirstOrDefault(candidate =>

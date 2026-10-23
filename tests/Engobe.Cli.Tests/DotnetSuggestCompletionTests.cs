@@ -24,6 +24,44 @@ public class DotnetSuggestCompletionTests
     }
 
     [Test]
+    [Arguments("engobe build . --ba", "--base-url")]
+    [Arguments("engobe build \"site with spaces\" --ba", "--base-url")]
+    [Arguments("engobe plugin update email-protect --fo", "--force")]
+    [Arguments("engobe plugin add Engobe.Plugin.EmailProtect . --so", "--source")]
+    public async Task CompletionRequest_ReturnsOptionsAfterPositionalArguments(string commandLine, string expected)
+    {
+        var directory = CreateTemporaryDirectory();
+        try
+        {
+            var (exitCode, output) = await RunSuggestAsync(directory, commandLine);
+
+            await Assert.That(exitCode).IsEqualTo(0);
+            await Assert.That(output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)).Contains(expected);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task CompletionRequest_UnknownSubcommand_DoesNotReturnOptions()
+    {
+        var directory = CreateTemporaryDirectory();
+        try
+        {
+            var (exitCode, output) = await RunSuggestAsync(directory, "engobe plugin missing --fo");
+
+            await Assert.That(exitCode).IsEqualTo(0);
+            await Assert.That(output).IsEmpty();
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
     public async Task CompletionRequest_ReturnsLockedPluginNamesForRemove()
     {
         var directory = CreateTemporaryDirectory();

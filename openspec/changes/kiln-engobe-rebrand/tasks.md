@@ -29,4 +29,12 @@
 - [x] 5.1 Run `rtk dotnet build` with zero warnings/errors, `dotnet test` without rtk using the repository's TUnit parallelism, and `rtk run jb inspectcode Engobe.slnx -e=WARNING -f=Text` with zero findings; distinguish any pre-existing failure.
 - [x] 5.2 Install packed Engobe tools in an isolated directory; execute scaffold, tool restore, build, preview HTTP readiness, a `dotnet-suggest` completion request, and EmailProtect installation from a local feed using `--source`; verify the recorded source, rendered output and generated deployment commands, then stop only the helper process started and remove only named temporary outputs.
 - [x] 5.3 Integrate exact package versions with Studio and both consumer sites, verify no accidental schema/URL changes, and run strict OpenSpec validation.
-- [ ] 5.4 Inspect staged paths/diff and `rtk git show --stat HEAD` after the implementation commit; verify no secrets, accidental generated files, provenance markers or unrelated changes, then hand off for an independent review.
+- [x] 5.4 Inspect staged paths/diff and `rtk git show --stat HEAD` after the implementation commit; verify no secrets, accidental generated files, provenance markers or unrelated changes, then hand off for an independent review.
+
+## Verification notes
+
+- Release build: zero warnings/errors. Tests: 826 passed, zero failed/skipped. InspectCode: zero findings. Normal package validation remains enabled and passes without an override; obsolete Kiln-baseline suppressions were removed.
+- Isolated consumer builds preserve all 55 website and 22 blog HTML routes, configuration and content hashes. Blog search and plugin assets build successfully. Studio uses exact Engobe library versions; the user accepted its initial smoke test and postponed the remaining Studio-specific manual checks.
+- A locally packed `2.0.0-beta.8+release-smoke` tool creates a manifest pinned to `2.0.0-beta.8`; tool restore and the generated site build succeed.
+- Independent review found no beta-release blocker. Its positional-argument completion finding was fixed with regression tests and handed back for focused verification.
+- The approved release target is the next beta, not stable. A publisher-free calculation with actual release notes recognizes `v2.0.0-beta.7` and calculates `2.0.0-beta.8` for a squash commit with a conventional `feat:` header and an explicit `BREAKING CHANGE:` footer.
