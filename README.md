@@ -18,6 +18,10 @@ engobe new my-site
 New sites pin the creating Engobe package version in `.config/dotnet-tools.json`,
 including its prerelease suffix. Restore that exact version with `dotnet tool restore`.
 
+NuGet symbol packages contain portable managed PDBs. Native Windows PDBs from
+runtime dependencies are excluded from tool packages; native runtime libraries
+remain included. CI and the release workflow validate symbol packages before publishing.
+
 Build and serve locally:
 
 ```bash
